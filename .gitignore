@@ -1,0 +1,11 @@
+#Kernel artifacts
+*.o
+*.ko
+*.mod.*
+*.symvers
+*.order
+Module.symvers
+module.order
+
+#Logs
+*.log
