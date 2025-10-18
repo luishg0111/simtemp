@@ -1,7 +1,9 @@
 #Kernel artifacts
 *.o
 *.ko
+*.mod
 *.mod.*
+*.cmd
 *.symvers
 *.order
 Module.symvers
