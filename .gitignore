@@ -1,13 +1,16 @@
-#Kernel artifacts
+# Folders
+.vscode/
+
+# Kernel artifacts
 *.o
 *.ko
+*.cmd
 *.mod
 *.mod.*
-*.cmd
 *.symvers
 *.order
 Module.symvers
 module.order
 
-#Logs
+# Logs
 *.log

@@ -1,7 +1,4 @@
-# Target module name
-obj-m := nxp_simtemp.o
-
-# Default kernel build directory (current running kernel)
+# Default kernel build directory
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
 PWD := $(shell pwd)
@@ -14,7 +11,4 @@ all:
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
-# Info rule
-info:
-	@echo "Building for kernel: $(shell uname -r)"
-	@echo "Using KDIR: $(KDIR)"
+.PHONY: all clean
