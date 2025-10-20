@@ -1,3 +1,3 @@
 # List of modules to build
 
-obj-m += nxp_simtemp.o
+obj-m := nxp_simtemp.o
