@@ -40,8 +40,8 @@ flowchart TB
   end
  subgraph KS["Kernel Space:<br>nxp_simtemp.ko"]
         K1["platform_driver struct<br>registered via module_platform_driver()"]
-        K2["probe(struct platform_device *pdev)<br>called when DT 'compatible' matches" ]
-        K3["of_property_read_u32()<br>read 'sampling-ms', 'threshold-mC'" ]
+        K2["probe(struct platform_device *pdev)<br>called when DT 'compatible' matches"]
+        K3["of_property_read_u32()<br>read 'sampling-ms', 'threshold-mC'"]
         K4["devm_kzalloc()<br>allocate device context"]
         K5["hrtimer_init() / hrtimer_start()\n periodic sampling"]
         K6["nxp_simtemp_timer_callback()<br>simulates temperature"]
@@ -52,7 +52,7 @@ flowchart TB
         K11["file_operations struct<br>defines read(), poll(), unlocked_ioctl()"]
         K13["hrtimer_cancel() / cleanup\ remove() path"]
   end
- subgraph DT["Device Tree:nxp-simtemp.dtsi"]
+ subgraph DT["Device Tree:</br>nxp-simtemp.dtsi"]
         D1["simtemp@0"]
         D2["compatible = \nxp,simtemp\"]
         D3["sampling-ms = &lt;100&gt;"]
@@ -64,7 +64,7 @@ flowchart TB
     U3 == sysfs ==> K9
     U2 == "insmod / rmmod nxp_simtemp.ko" ==> K1
     K1 -- match compatible string --> K2
-    K3 -- read properties --> K2
+    K2 -- read properties --> K3
     K2 -- allocate context --> K4
     K2 -- initialize hrtimer --> K5
     K5 -- callback --> K6
