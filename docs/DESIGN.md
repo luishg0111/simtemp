@@ -108,17 +108,17 @@ flowchart TB
 3. The driver continuously updates internal metrics (e.g. timestamp) as part of the simulation logic.
 
 ## 3. User-Space Interaction
+### User interface (CLI/GUI)
+1. Character Device Interface (`/dev/simtemp`)
+    - **User interface* use `open()`, `read()`, `poll()`, or `ioctl()` system calls.
+    - `read()` copies the latest temperature samples to user space via `copy_to_user()`.
+    - `poll()` allows applications to wait for new data events asynchronously.
 
-### Character Device Interface (`/dev/simtemp`)
-- Applications use `open()`, `read()`, `poll()`, or `ioctl()` system calls.
-- `read()` copies the latest temperature samples to user space via `copy_to_user()`.
-- `poll()` allows applications to wait for new data events asynchronously.
-
-### Sysfs Interface (`/sys/class/simtemp/`)
-- Users or scripts can modify configuration parameters dynamically e.g:
-  ```bash
-  echo 500 > /sys/class/simtemp/sampling_ms
-  echo 42000 > /sys/class/simtemp/threshold_mC
-  ```
+2. Sysfs Interface (`/sys/class/simtemp/`)
+    - User can modify configuration parameters dynamically through **User interface** e.g:
+      ```bash
+      echo 500 > /sys/class/simtemp/sampling_ms
+      echo 42000 > /sys/class/simtemp/threshold_mC
+      ```
 
 
