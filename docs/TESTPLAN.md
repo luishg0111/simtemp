@@ -1,0 +1,6 @@
+- **T1 — Load/Unload:** build → `insmod` → verify `/dev/simtemp` & sysfs → `rmmod` (no warnings).
+- **T2 — Periodic Read:** set `sampling_ms=100`; verify ~10±1 samples/sec using timestamps.
+- **T3 — Threshold Event:** lower threshold slightly below mean; ensure `poll` unblocks within 2–3 periods and flag is set.
+- **T4 — Error Paths:** invalid sysfs writes → `-EINVAL`; very fast sampling (e.g., `1ms`) doesn’t wedge; `stats` still increments.
+- **T5 — Concurrency:** run reader + config writer concurrently; no deadlocks; safe unload.
+- **T6 — API Contract:** struct size/endianness documented; user app handles partial reads.
