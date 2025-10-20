@@ -12,6 +12,6 @@ all:
 # Clean rule
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	rm -rf $(BUILD_DIR)/
+	rm -rf $(BUILD_DIR)
 
 .PHONY: all clean
