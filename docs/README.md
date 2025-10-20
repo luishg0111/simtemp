@@ -10,3 +10,12 @@ This project implements a **virtual temperature sensor** in the Linux Kernel, si
 - **User space app (Python **or** C++**): CLI required; optional GUI to visualize reading/alerts.
 - **Shell scripts**: build, run demo, (optional) lint.
 - **Design quality**: modularity, locking choices, API contract, problem\-solving write\-ups.
+
+## Build steps
+Run script:
+```bash
+    ./scripts/build.sh
+```
+> Note: verify execution permisions: ```bash chmod +x scripts/build.sh```
+
+## Run steps
