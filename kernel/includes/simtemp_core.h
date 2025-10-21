@@ -15,24 +15,29 @@
 /*******************************************************************************
  * Includes
  ******************************************************************************/
-#include <linux/hrtimer.h>
-#include <linux/miscdevice.h>
-#include <linux/spinlock.h>
 #include <linux/types.h>
+#include <linux/spinlock.h>
+#include <linux/hrtimer.h>
+#include <linux/wait.h>
 #include <linux/device.h>
+#include <linux/miscdevice.h>
 
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
 /* Default config values */
-#define NXP_SIMTEMP_DEFAULT_SAMPLING_MS 100
-#define NXP_SIMTEMP_DEFAULT_THRESHOLD_MILLIC 45000
+#define SIMTEMP_DEFAULT_SAMPLING_MS 100
+#define SIMTEMP_DEFAULT_THRESHOLD_MILLIC 45000
 
 /* Event flag bits */
 #define SIMTEMP_FLAG_NEW_SAMPLE        (1U << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED (1U << 1)
 
-#define RING_SIZE 128
+#define DRIVER_NAME "nxp_simtemp"
+#define DEVICE_NAME "simtemp"
+#define COMPATIBLE_NAME "nxp,simtemp"
+
+#define RING_BUFF_SIZE 128
 /*******************************************************************************
  * Types
  ******************************************************************************/
@@ -48,21 +53,35 @@ struct simtemp_data {
 	struct hrtimer timer;   /* timer */
 	ktime_t period;         /* period */
   	
-	struct simtemp_sample samples[RING_SIZE];  /* ring buffer of samples */
+	struct simtemp_sample samples[RING_BUFF_SIZE];  /* ring buffer of samples */
 	unsigned int head;      /* next write position */
 	unsigned int tail;      /* next read position */
 	unsigned int count;     /* number of samples present */
+    wait_queue_head_t wq;   /* waitqueue for readers */
 
     int temp_mC;            /* current temperature in milli-degrees C */
     int threshold_mC;       /* alert threshold (milli-deg C) */
     int sampling_ms;        /* sampling interval (ms) */
     u64 total_samples;
 	
+    struct simtemp_sample last_sample; /* last sample read */
 	spinlock_t lock;        /* sync */
 
     struct miscdevice miscdev;  /* misc device for /dev/simtemp */
 
 	struct device *dev;     /* device for dev_info */
+    
+    struct device *sysfs_dev;  /* sysfs device */
+
 };
+
+/*******************************************************************************
+ * Prototypes
+ ******************************************************************************/
+
+/*******************************************************************************
+ * Variables
+ ******************************************************************************/
+
 
 #endif /* _SIMTEMP_CORE_H_ */

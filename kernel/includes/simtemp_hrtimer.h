@@ -30,13 +30,15 @@
  * Prototypes
  ******************************************************************************/
 /* API exposed by hrtimer engine */
-int simtemp_hrtimer_init(struct simtemp_data *sdev, u32 sampling_ms);
-void simtemp_hrtimer_exit(struct simtemp_data *sdev);
+int simtemp_hrtimer_init(struct simtemp_data *sdat, u32 sampling_ms);
+void simtemp_hrtimer_exit(struct simtemp_data *sdat);
 
-/* push new sample manually (for testing) */
+/* ring helpers used by char device */
+bool simtemp_ring_has_data(struct simtemp_data *sdat);
+int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
+void simtemp_ring_push(struct simtemp_data *s, const struct simtemp_sample *sample);
+
 enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
-void ring_push_sample(struct simtemp_data *s, const struct simtemp_sample *sample);
-int ring_pop_sample(struct simtemp_data *s, struct simtemp_sample *out);
  /*******************************************************************************
  * Variables
  ******************************************************************************/
