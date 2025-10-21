@@ -2,16 +2,9 @@
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
 PWD := $(shell pwd)
-BUILD_DIR="${PWD}/build"
 
-# Default rule
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
-	mkdir -p $(BUILD_DIR)
+all default: modules
+install: modules_install
 
-# Clean rule
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	rm -rf $(BUILD_DIR)
-
-.PHONY: all clean
+modules modules_install help clean:
+	$(MAKE) -C $(KDIR) M=$(PWD) $@

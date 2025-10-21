@@ -5,7 +5,9 @@
 
 # Exit immediately if a command exits with a non-zero status
 set -e
-
+# Exit when trying to use undefined variables
+set -u
+ 
 # Colors for status messages
 PASS="\033[1;32m"   # PASS
 ERR="\033[1;31m"    # ERR
@@ -19,8 +21,24 @@ BUILD_DIR="${KERNEL_DIR}/build"
 KERNEL_RELEASE="$(uname -r)"
 KERNEL_HEADERS="/lib/modules/${KERNEL_RELEASE}/build"
 
-echo -e "${WARN}[*] Building simtemp kernel module. Kernel version: ${KERNEL_RELEASE}${NW}"
+# Clean function
+clean_build() {
+    echo -e "${WARN}[*] Cleaning nxp_simtemp.ko build artifacts...${NW}"
+    cd "${KERNEL_DIR}"
+    make clean >/dev/null 2>&1 || true
+    if [ -d "${BUILD_DIR}" ]; then
+        rm -rf "${BUILD_DIR}"
+        echo -e "${PASS}[OK] Build directory cleaned${NW}"
+    fi
+    exit 0
+}
 
+# Check if clean parameter was passed
+if [ $# -eq 1 ] && [ "$1" = "clean" ]; then
+    clean_build
+fi
+
+echo -e "${WARN}[*] Building simtemp kernel module. Kernel version: ${KERNEL_RELEASE}${NW}"
 # --------------------------------------------------------------------------
 # Check dependeNWies
 # --------------------------------------------------------------------------
@@ -54,6 +72,7 @@ if [ -f "${KO_FILE}" ]; then
     echo -e "${PASS}[OK] Build successful!${NW}"
 
     # Move build artifacts to build directory
+    mkdir -p "${BUILD_DIR}"
     mv ${KO_FILE} "${BUILD_DIR}/"
     for ext in o cmd mod mod.c symvers order; do
         find . -maxdepth 1 -name "*.${ext}" -exec mv {} "${BUILD_DIR}/" \;
