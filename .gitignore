@@ -13,5 +13,8 @@ kernel/build/
 Module.symvers
 module.order
 
+# Device Tree files
+*.dtbo
+
 # Logs
 *.log

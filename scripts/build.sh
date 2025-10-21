@@ -83,6 +83,21 @@ else
     echo -e "${ERR}[ERROR] Build failed — module not found in ${BUILD_DIR}${NW}"
     exit 1
 fi
+# --------------------------------------------------------------------------
+# Compile the Device Tree Overlay
+# --------------------------------------------------------------------------
+echo -e  "${WARN}[*] Compiling nxp-simtemp.dtsi ..."
+
+dtc -O dtb -o "${BUILD_DIR}/nxp-simtemp.dtbo" -@ \
+    "${ROOT_DIR}/kernel/dts/nxp-simtemp.dtsi"
+exit_code="$?"
+
+if [ "${exit_code}" -ne 0 ] || [ ! -e "${BUILD_DIR}/nxp-simtemp.dtbo" ]; then
+    echo -e  "${ERR}[ERROR] Device Tree Overlay compilation"
+    local_exit 21
+fi
+
+echo -e  "[OK] nxp-simtemp.dtbo created"
 
 # --------------------------------------------------------------------------
 # Success message

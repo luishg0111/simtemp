@@ -30,21 +30,31 @@
 extern int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
 extern bool simtemp_ring_has_data(struct simtemp_data *sdat);
 
+static int simtemp_open(struct inode *inode, struct file *pfil);
 static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos);
 static __poll_t simtemp_poll(struct file *pfil, poll_table *wait);
-
 /*******************************************************************************
  * Variables
  ******************************************************************************/
 static const struct file_operations simtemp_fops = {
 	.owner  = THIS_MODULE,
+    .open   = simtemp_open,
 	.read   = simtemp_read,
 	.poll   = simtemp_poll,
 };
 /*******************************************************************************
  * Code
  ******************************************************************************/ 
-static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos)
+static int simtemp_open(struct inode *inode, struct file *pfil)
+{
+	struct miscdevice *mdev = pfil->private_data;
+	struct simtemp_data *sdat = container_of(mdev, struct simtemp_data, miscdev);
+
+	pfil->private_data = sdat;
+	return 0;
+}
+
+ static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct simtemp_data *sdat = pfil->private_data;
     unsigned long flags;
@@ -120,6 +130,9 @@ int simtemp_char_init(struct simtemp_data *sdat)
 	sdat->miscdev.minor = MISC_DYNAMIC_MINOR;
 	sdat->miscdev.name  = DEVICE_NAME;
 	sdat->miscdev.fops  = &simtemp_fops;
+
+    if (!sdat->dev)
+    pr_warn("nxp_simtemp: sdev->dev is NULL before misc_register()\n");
 
 	ret = misc_register(&sdat->miscdev);
 	if (ret)

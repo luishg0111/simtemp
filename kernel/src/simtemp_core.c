@@ -46,6 +46,7 @@ static void __exit simtemp_exit_module(void);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+static struct platform_device *simtemp_pdev;
 
 /* Device tree binding */
 static const struct of_device_id simtemp_dt_ids[] = {
@@ -79,7 +80,7 @@ static int simtemp_probe(struct platform_device *pdev)
 	struct simtemp_data *sdat;
 	u32 sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
 	u32 threshold_mC = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
-	int ret;
+	int ret = 0;
 
 	sdat = devm_kzalloc(&pdev->dev, sizeof(*sdat), GFP_KERNEL);
 	if (!sdat)
@@ -132,7 +133,7 @@ static int simtemp_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, sdat);
 	dev_info(&pdev->dev, "%s: probe ok (sampling=%u ms)\n", DRIVER_NAME, sdat->sampling_ms);
-	return 0;
+	return ret;
 }
 
 /**
@@ -151,12 +152,26 @@ static void simtemp_remove(struct platform_device *pdev)
 /* module init/exit */
 static int __init simtemp_init_module(void)
 {
-	int ret;
+	int ret = 0;
 	
+    struct platform_device_info pdevinfo = {
+        .name = "nxp_simtemp", /* must match .compatible in your DT table */
+        .id = -1,
+    };
+
+	pr_info("%s: registering fake platform device\n", DRIVER_NAME);
+
+	/* Create a fake platform_device */
+	simtemp_pdev = platform_device_register_full(&pdevinfo);
+    if (IS_ERR(simtemp_pdev))
+	{
+        return PTR_ERR(simtemp_pdev);
+	}
+
 	/* Register the platform_driver (your main driver) */
     ret = platform_driver_register(&simtemp_driver);
     if (ret) {
-		pr_err("nxp_simtemp: failed to register platform driver: %d\n", ret);
+		pr_err("%s: failed to register platform driver: %d\n", DRIVER_NAME, ret);
         return ret;
     }
 
@@ -169,6 +184,7 @@ static void __exit simtemp_exit_module(void)
 {
 	pr_info("%s: unregistering driver and device\n", DRIVER_NAME);
 	platform_driver_unregister(&simtemp_driver);
+	platform_device_unregister(simtemp_pdev);
 }
 
 module_init(simtemp_init_module);
