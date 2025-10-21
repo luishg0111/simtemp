@@ -18,7 +18,6 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/ktime.h>
-#include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/of.h>
@@ -42,6 +41,8 @@
 static int simtemp_probe(struct platform_device *pdev);
 static void simtemp_remove(struct platform_device *pdev);
 
+static int __init simtemp_init_module(void);
+static void __exit simtemp_exit_module(void);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -63,7 +64,6 @@ static struct platform_driver simtemp_driver = {
     .remove = simtemp_remove,
 };
 
-module_platform_driver(simtemp_driver);
 /*******************************************************************************
  * Code
  ******************************************************************************/
@@ -78,11 +78,13 @@ static int simtemp_probe(struct platform_device *pdev)
 {
 	struct simtemp_data *sdat;
 	u32 sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
+	u32 threshold_mC = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 	int ret;
 
 	sdat = devm_kzalloc(&pdev->dev, sizeof(*sdat), GFP_KERNEL);
 	if (!sdat)
 	{
+		dev_err(&pdev->dev, "%s: failed to alloc device context\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
 
@@ -94,20 +96,42 @@ static int simtemp_probe(struct platform_device *pdev)
 		of_property_read_u32(pdev->dev.of_node, "threshold-mC", &sdat->threshold_mC);
 	}
 
-	/* init hrtimer + ring + state */
-	ret = simtemp_hrtimer_init(sdat, sampling_ms);
-	if (ret)
-		return ret;
+	/* ensure sensible defaults if DT helper left them zero/uninitialized */
+	if (sdat->sampling_ms == 0)
+	{
+		sdat->sampling_ms = sampling_ms;
+	}
+		
+	if (sdat->threshold_mC == 0)
+	{
+		sdat->threshold_mC = threshold_mC;
+	}
 
-	/* expose /dev/simtemp */
+	/* initialize basic fields (lock, initial temp, counters) */
+	spin_lock_init(&sdat->lock);
+	sdat->temp_mC = 42000; /* initial ~42.0°C */
+	sdat->count = 0;
+
+	/* store sampling period in ktime in hr timer init, submodule will use sampling_ms */
+	dev_info(&pdev->dev, "%s: config sampling_ms=%u threshold_mC=%u\n",
+	         DRIVER_NAME, sdat->sampling_ms, sdat->threshold_mC);
+
+	/* 1) Initialize sampling engine (hrtimer) */
+	ret = simtemp_hrtimer_init(sdat, sdat->sampling_ms);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: failed to init hrtimer (%d)\n", DRIVER_NAME, ret);
+		return ret; /* devm allocation -> no explicit free */
+	}
+
+	/* 2) Initialize char device (/dev/simtemp) */
 	ret = simtemp_char_init(sdat);
 	if (ret) {
+		dev_err(&pdev->dev, "%s: failed to init char device (%d)\n", DRIVER_NAME, ret);
 		simtemp_hrtimer_exit(sdat);
-		return ret;
 	}
 
 	platform_set_drvdata(pdev, sdat);
-	dev_info(&pdev->dev, "nxp_simtemp: probe ok (sampling=%u ms)\n", sdat->sampling_ms);
+	dev_info(&pdev->dev, "%s: probe ok (sampling=%u ms)\n", DRIVER_NAME, sdat->sampling_ms);
 	return 0;
 }
 
@@ -124,9 +148,34 @@ static void simtemp_remove(struct platform_device *pdev)
 	dev_info(&pdev->dev, "nxp_simtemp: removed\n");
 }
 
+/* module init/exit */
+static int __init simtemp_init_module(void)
+{
+	int ret;
+	
+	/* Register the platform_driver (your main driver) */
+    ret = platform_driver_register(&simtemp_driver);
+    if (ret) {
+		pr_err("nxp_simtemp: failed to register platform driver: %d\n", ret);
+        return ret;
+    }
+
+	pr_info("%s: platform driver registered successfully\n", DRIVER_NAME);
+	
+	return ret;
+}
+
+static void __exit simtemp_exit_module(void)
+{
+	pr_info("%s: unregistering driver and device\n", DRIVER_NAME);
+	platform_driver_unregister(&simtemp_driver);
+}
+
+module_init(simtemp_init_module);
+module_exit(simtemp_exit_module);
 
 /* METADATA */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Luis Hernández <luishg0111@gmail.com>");
 MODULE_DESCRIPTION("Virtual temperature sensor driver");
-MODULE_VERSION("0.3");
+MODULE_VERSION("0.4");
