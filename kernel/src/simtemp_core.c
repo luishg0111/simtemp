@@ -39,7 +39,7 @@
  * Prototypes
  ******************************************************************************/
 static int simtemp_probe(struct platform_device *pdev);
-static void simtemp_remove(struct platform_device *pdev);
+static int simtemp_remove(struct platform_device *pdev);
 
 static int __init simtemp_init_module(void);
 static void __exit simtemp_exit_module(void);
@@ -141,12 +141,14 @@ static int simtemp_probe(struct platform_device *pdev)
  * 
  * @param pdev 
  */
-static void simtemp_remove(struct platform_device *pdev)
+static int simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_data *sdat = platform_get_drvdata(pdev);
 	simtemp_char_exit(sdat);
 	simtemp_hrtimer_exit(sdat);
 	dev_info(&pdev->dev, "nxp_simtemp: removed\n");
+
+	return 0;
 }
 
 /* module init/exit */
