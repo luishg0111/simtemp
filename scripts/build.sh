@@ -36,6 +36,10 @@ clean_build() {
 # Check if clean parameter was passed
 if [ $# -eq 1 ] && [ "$1" = "clean" ]; then
     clean_build
+elif [ $# -gt 0 ]; then
+    echo -e "${ERR}[ERROR] Invalid argument: $1${NW}"
+    echo "Usage: bash scripts/build.sh [clean]"
+    exit 1
 fi
 
 echo -e "${WARN}[*] Building simtemp kernel module. Kernel version: ${KERNEL_RELEASE}${NW}"
@@ -64,21 +68,36 @@ make clean >/dev/null 2>&1 || true
 make
 
 # --------------------------------------------------------------------------
-# Verify build artifacts
+# Verify and move build artifacts
 # --------------------------------------------------------------------------
-KO_FILE=$(find "${KERNEL_DIR}" -maxdepth 1 -name "nxp_simtemp.ko" 2>/dev/null || true)
+KO_FILE=$(find "${KERNEL_DIR}" -maxdepth 1 -name "*.ko" 2>/dev/null || true)
 
 if [ -f "${KO_FILE}" ]; then
     echo -e "${PASS}[OK] Build successful!${NW}"
 
+    echo -e  "${WARN}[*] Moving build artifacts ..."
     # Move build artifacts to build directory
     mkdir -p "${BUILD_DIR}"
-    mv ${KO_FILE} "${BUILD_DIR}/"
-    for ext in o cmd mod mod.c symvers order; do
-        find . -maxdepth 1 -name "*.${ext}" -exec mv {} "${BUILD_DIR}/" \;
-    done
 
-    echo -e "-> Module built at: ${BUILD_DIR}${NW}"
+    # Exclude the build output directory by name (we're running from ${KERNEL_DIR})
+    BUILD_DIRNAME="$(basename "${BUILD_DIR}")"
+
+    find . -type f \
+        \( -name '*.ko' -o \
+            -name '*.o' -o \
+            -name '.*.cmd' -o \
+            -name '*.o.cmd' -o \
+            -name '*.mod' -o \
+            -name '*.mod.c' -o \
+            -name '*.d' -o \
+            -name '*.symvers' -o \
+            -name '*.order' \) \
+        -not -path "./${BUILD_DIRNAME}/*" \
+        -not -path "./.tmp_versions/*" \
+        -not -path "./.git/*" \
+        -exec mv -t "${BUILD_DIR}" -- {} +
+
+    echo -e "-> Module built at: "${BUILD_DIR}"${NW}" 
 else
     echo -e "${ERR}[ERROR] Build failed — module not found in ${BUILD_DIR}${NW}"
     exit 1
@@ -87,6 +106,13 @@ fi
 # Compile the Device Tree Overlay
 # --------------------------------------------------------------------------
 echo -e  "${WARN}[*] Compiling nxp-simtemp.dtsi ..."
+
+if ! command -v dtc &> /dev/null; then
+    echo -e "${ERR}[ERROR] 'make' command not found. Please install it.${NW}"
+    echo "Install with:"
+    echo "  sudo apt install device-tree-compiler"
+    exit 1
+fi
 
 dtc -O dtb -o "${BUILD_DIR}/nxp-simtemp.dtbo" -@ \
     "${ROOT_DIR}/kernel/dts/nxp-simtemp.dtsi"
@@ -97,10 +123,10 @@ if [ "${exit_code}" -ne 0 ] || [ ! -e "${BUILD_DIR}/nxp-simtemp.dtbo" ]; then
     local_exit 21
 fi
 
-echo -e  "[OK] nxp-simtemp.dtbo created"
+echo -e  "${PASS}[OK] nxp-simtemp.dtbo created"
 
 # --------------------------------------------------------------------------
 # Success message
 # --------------------------------------------------------------------------
 echo -e "${PASS} Build Done. You can run:${NW}"
-echo "  scripts/run_demo.sh"
+echo "  bash scripts/run_demo.sh"
