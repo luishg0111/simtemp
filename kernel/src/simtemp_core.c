@@ -46,6 +46,7 @@ static void __exit simtemp_exit_module(void);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
+// Global pointer for the manually created platform device
 static struct platform_device *simtemp_pdev;
 
 /* Device tree binding */
@@ -82,13 +83,16 @@ static int simtemp_probe(struct platform_device *pdev)
 	u32 threshold_mC = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 	int ret = 0;
 
+	dev_info(&pdev->dev, "Compatible driver detected. Initializing resources...\n");
+
 	sdat = devm_kzalloc(&pdev->dev, sizeof(*sdat), GFP_KERNEL);
 	if (!sdat)
 	{
 		dev_err(&pdev->dev, "%s: failed to alloc device context\n", DEVICE_NAME);
 		return -ENOMEM;
 	}
-
+	
+	platform_set_drvdata(pdev, sdat);
 	sdat->dev = &pdev->dev;
 
 	/* Optional DT: read sampling-ms / threshold-mC if present */
@@ -161,7 +165,14 @@ static int __init simtemp_init_module(void)
         .id = -1,
     };
 
-	pr_info("%s: registering fake platform device\n", DRIVER_NAME);
+	pr_info("%s: registering manual platform device\n", DRIVER_NAME);
+
+	/* Register the platform_driver (your main driver) */
+    ret = platform_driver_register(&simtemp_driver);
+    if (ret) {
+		pr_err("%s: failed to register platform driver: %d\n", DRIVER_NAME, ret);
+        return ret;
+    }
 
 	/* Create a fake platform_device */
 	simtemp_pdev = platform_device_register_full(&pdevinfo);
@@ -170,12 +181,6 @@ static int __init simtemp_init_module(void)
         return PTR_ERR(simtemp_pdev);
 	}
 
-	/* Register the platform_driver (your main driver) */
-    ret = platform_driver_register(&simtemp_driver);
-    if (ret) {
-		pr_err("%s: failed to register platform driver: %d\n", DRIVER_NAME, ret);
-        return ret;
-    }
 
 	pr_info("%s: platform driver registered successfully\n", DRIVER_NAME);
 	

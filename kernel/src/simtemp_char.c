@@ -131,21 +131,12 @@ int simtemp_char_init(struct simtemp_data *sdat)
 	sdat->miscdev.name  = DEVICE_NAME;
 	sdat->miscdev.fops  = &simtemp_fops;
 
-    if (!sdat->dev)
-    pr_warn("nxp_simtemp: sdev->dev is NULL before misc_register()\n");
-
 	ret = misc_register(&sdat->miscdev);
 	if (ret)
     {
         dev_err(sdat->dev, "failed to register misc device: %d\n", ret);
         return ret;
     }
-		
-	ret = misc_register(&sdat->miscdev);
-	if (ret) {
-		dev_err(sdat->dev, "failed to register misc device: %d\n", ret);
-		return ret;
-	}
 
 	dev_info(sdat->dev, "simtemp char device ready: /dev/%s\n", sdat->miscdev.name);
 	
