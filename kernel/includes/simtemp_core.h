@@ -25,6 +25,11 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
+/* Driver names */
+#define DRIVER_NAME "nxp_simtemp"
+#define DEVICE_NAME "simtemp"
+#define COMPATIBLE_NAME "nxp,simtemp"
+
 /* Default config values */
 #define SIMTEMP_DEFAULT_SAMPLING_MS 100
 #define SIMTEMP_DEFAULT_THRESHOLD_MILLIC 45000
@@ -33,10 +38,7 @@
 #define SIMTEMP_FLAG_NEW_SAMPLE        (1U << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED (1U << 1)
 
-#define DRIVER_NAME "nxp_simtemp"
-#define DEVICE_NAME "simtemp"
-#define COMPATIBLE_NAME "nxp,simtemp"
-
+/* Ring buffer size */
 #define RING_BUFF_SIZE 128
 /*******************************************************************************
  * Types
@@ -54,6 +56,12 @@ enum simtemp_mode {
     RAMP    /* Ramp mode */
 };
 
+struct ring_buffer {
+    struct simtemp_sample samples[RING_BUFF_SIZE]; /* ring buffer of samples */
+    int head;   /* next write position */
+    int tail;   /* next read position */
+    spinlock_t lock;
+};
 struct simtemp_stats {
     unsigned long update_count;
     unsigned long alert_count;
@@ -62,14 +70,14 @@ struct simtemp_stats {
 /* Internal device data */
 struct simtemp_data {
     struct miscdevice miscdev;  /* misc device for /dev/simtemp */
-	struct device *dev;     /* device for dev_info */	
-	struct hrtimer timer;   /* timer */
-	ktime_t period;         /* period */
-  	
-	struct simtemp_sample samples[RING_BUFF_SIZE];  /* ring buffer of samples */
-	unsigned int head;      /* next write position */
-	unsigned int tail;      /* next read position */
-	unsigned int count;     /* number of samples present */
+    struct device *dev;     /* device for dev_info */	
+    struct hrtimer timer;   /* timer */
+    ktime_t period;         /* period */
+      
+    struct simtemp_sample samples[RING_BUFF_SIZE];  
+    unsigned int head;      
+    unsigned int tail;      /* next read position */
+    unsigned int count;     /* number of samples present */
     wait_queue_head_t wq;   /* waitqueue for readers */
 
     int temp_mC;            /* current temperature in milli-degrees C */
@@ -79,9 +87,9 @@ struct simtemp_data {
 
     struct simtemp_stats stats; /* statistics */
     enum simtemp_mode mode;     /* operating mode */
-	
+    
     struct simtemp_sample last_sample; /* last sample read */
-	spinlock_t lock;        /* sync */
+    spinlock_t lock;        /* sync */
 };
 
 /*******************************************************************************
