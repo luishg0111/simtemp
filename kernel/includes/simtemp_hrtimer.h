@@ -35,8 +35,10 @@ void simtemp_hrtimer_exit(struct simtemp_data *sdat);
 
 /* ring helpers used by char device */
 bool simtemp_ring_has_data(struct simtemp_data *sdat);
-int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
-void simtemp_ring_push(struct simtemp_data *s, const struct simtemp_sample *sample);
+int  simtemp_ring_pop(struct simtemp_data *sdat,
+                        struct simtemp_sample *out);
+void simtemp_ring_push(struct simtemp_data *s, 
+                        const struct simtemp_sample *sample);
 
 enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
  /*******************************************************************************

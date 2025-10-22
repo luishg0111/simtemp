@@ -48,8 +48,21 @@ struct simtemp_sample{
     __u32 flags;            /* status/event flags */
 } __attribute__((packed));
 
+enum simtemp_mode {
+    NORMAL, /* Default mode */
+    NOISY,  /* Noisy mode */
+    RAMP    /* Ramp mode */
+};
+
+struct simtemp_stats {
+    unsigned long update_count;
+    unsigned long alert_count;
+    unsigned long error_count;
+};
 /* Internal device data */
-struct simtemp_data {	
+struct simtemp_data {
+    struct miscdevice miscdev;  /* misc device for /dev/simtemp */
+	struct device *dev;     /* device for dev_info */	
 	struct hrtimer timer;   /* timer */
 	ktime_t period;         /* period */
   	
@@ -63,16 +76,12 @@ struct simtemp_data {
     int threshold_mC;       /* alert threshold (milli-deg C) */
     int sampling_ms;        /* sampling interval (ms) */
     u64 total_samples;
+
+    struct simtemp_stats stats; /* statistics */
+    enum simtemp_mode mode;     /* operating mode */
 	
     struct simtemp_sample last_sample; /* last sample read */
 	spinlock_t lock;        /* sync */
-
-    struct miscdevice miscdev;  /* misc device for /dev/simtemp */
-
-	struct device *dev;     /* device for dev_info */
-    
-    struct device *sysfs_dev;  /* sysfs device */
-
 };
 
 /*******************************************************************************

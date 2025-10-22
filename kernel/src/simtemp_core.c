@@ -26,7 +26,7 @@
 
 #include "simtemp_hrtimer.h"
 #include "simtemp_char.h"
-
+#include "simtemp_sysfs.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -135,8 +135,17 @@ static int simtemp_probe(struct platform_device *pdev)
 		simtemp_hrtimer_exit(sdat);
 	}
 
+	/* 3) Initialize sysfs attributes */
+	ret = simtemp_sysfs_init(sdat);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: failed to create sysfs attributes (%d)\n", DRIVER_NAME, ret);
+		simtemp_char_exit(sdat);
+	}
+
+	/* store pointer for remove path */
 	platform_set_drvdata(pdev, sdat);
-	dev_info(&pdev->dev, "%s: probe ok (sampling=%u ms)\n", DRIVER_NAME, sdat->sampling_ms);
+
+	dev_info(&pdev->dev, "%s: probe successful\n (sampling=%u ms)\n", DRIVER_NAME, sdat->sampling_ms);
 	return ret;
 }
 
@@ -148,9 +157,18 @@ static int simtemp_probe(struct platform_device *pdev)
 static int simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_data *sdat = platform_get_drvdata(pdev);
+	
+	/* Remove sysfs */
+	simtemp_sysfs_exit(sdat);
+	
+	/* Remove char device */
 	simtemp_char_exit(sdat);
+
+	/* Remove hrtimer */
 	simtemp_hrtimer_exit(sdat);
-	dev_info(&pdev->dev, "nxp_simtemp: removed\n");
+
+	dev_info(&pdev->dev, "%s: removed cleanly (total samples=%llu)\n",
+	         DRIVER_NAME, (unsigned long long)sdat->total_samples);
 
 	return 0;
 }

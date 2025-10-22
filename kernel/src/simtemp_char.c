@@ -27,11 +27,13 @@
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-extern int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
+extern int  simtemp_ring_pop(struct simtemp_data *sdat, 
+                                struct simtemp_sample *out);
 extern bool simtemp_ring_has_data(struct simtemp_data *sdat);
 
 static int simtemp_open(struct inode *inode, struct file *pfil);
-static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos);
+static ssize_t simtemp_read(struct file *pfil, char __user *buf,
+                                size_t len, loff_t *ppos);
 static __poll_t simtemp_poll(struct file *pfil, poll_table *wait);
 /*******************************************************************************
  * Variables
@@ -54,7 +56,7 @@ static int simtemp_open(struct inode *inode, struct file *pfil)
 	return 0;
 }
 
- static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos)
+ static ssize_t simtemp_read(struct file *pfil, char __user *buf,size_t len, loff_t *ppos)
 {
 	struct simtemp_data *sdat = pfil->private_data;
     unsigned long flags;
