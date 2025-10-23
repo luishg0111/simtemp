@@ -38,6 +38,11 @@
 #define SIMTEMP_DEFAULT_TEMPERATURE_MC 42000
 #define SIMTEMP_DEFAULT_TIMESTAMP_NS 0ULL
 #define SIMTEMP_DEFAULT_MODE 0 /* NORMAL mode */
+
+/* Global limits for period sampling_ms*/
+#define SIMTEMP_SAMPLING_MS_MAX 10u
+#define SIMTEMP_SAMPLING_MS_MIN 10000u
+
 /* Event flag bits */
 #define SIMTEMP_FLAG_NEW_SAMPLE        (1U << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED (1U << 1)

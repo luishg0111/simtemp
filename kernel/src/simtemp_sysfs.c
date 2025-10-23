@@ -89,8 +89,9 @@ static ssize_t sampling_ms_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (new_ms == 0 || new_ms > 10000) {
-		dev_warn(dev, "sampling_ms (period) out of range (0 to 10000 ms).\n");
+	if (new_ms < SIMTEMP_SAMPLING_MS_MIN || new_ms > SIMTEMP_SAMPLING_MS_MAX) {
+		dev_warn(dev, "sampling_ms (period) out of range (%u to %u ms).\n",
+			 SIMTEMP_SAMPLING_MS_MIN, SIMTEMP_SAMPLING_MS_MAX);
 		return -EINVAL;
 	}
 
