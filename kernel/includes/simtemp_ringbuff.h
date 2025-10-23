@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /**
- * @file simtemp_char.h
+ * @file simtemp_ringbuff.h
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief
  * @version 0.1
@@ -9,29 +9,30 @@
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
  *
  */
+#ifndef _SIMTEMP_RINGBUFF_H_
+#define _SIMTEMP_RINGBUFF_H_
 
-#ifndef _SIMTEMP_CHAR_H_
-#define _SIMTEMP_CHAR_H_
 /*******************************************************************************
  * Includes
  ******************************************************************************/
 #include "simtemp_core.h"
-
-/*******************************************************************************
+ /*******************************************************************************
  * Definitions
  ******************************************************************************/
 
-/*******************************************************************************
+ /*******************************************************************************
  * Types
  ******************************************************************************/
 
-/*******************************************************************************
+ /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-int simtemp_char_init(struct simtemp_data *sdat);
-void simtemp_char_exit(struct simtemp_data *sdat);
-/*******************************************************************************
+bool simtemp_rb_has_data(struct ring_buffer *rb);
+int  simtemp_rb_pop(struct ring_buffer *rb, struct simtemp_sample *out);
+void simtemp_rb_push(struct ring_buffer *rb, const struct simtemp_sample *sample);
+ /*******************************************************************************
  * Variables
  ******************************************************************************/
 
-#endif /* _SIMTEMP_CHAR_H_ */
+
+#endif /* _SIMTEMP_RINGBUFF_H_ */

@@ -6,5 +6,6 @@ nxp_simtemp-objs := src/simtemp_core.o \
                     src/simtemp_hrtimer.o \
                     src/simtemp_char.o \
                     src/simtemp_sysfs.o \
+                    src/simtemp_ringbuff.o
 
 ccflags-y := -I$(src)/includes

@@ -18,6 +18,9 @@
 #include <linux/spinlock.h>
 
 #include "simtemp_char.h"
+
+#include "simtemp_core.h"
+#include "simtemp_ringbuff.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -29,11 +32,9 @@
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
-
-static int simtemp_open(struct inode *inode, struct file *pfil);
-static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos);
-static __poll_t simtemp_poll(struct file *pfil, poll_table *wait);
+static int simtemp_open(struct inode *inode, struct file *file);
+static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, loff_t *ppos);
+static __poll_t simtemp_poll(struct file *file, poll_table *wait);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -52,15 +53,15 @@ static const struct file_operations simtemp_fops = {
  *@brief Open function for simtemp character device
  *
  *@param inode
- *@param pfil
+ *@param file
  *@return int
  */
-static int simtemp_open(struct inode *inode, struct file *pfil)
+static int simtemp_open(struct inode *inode, struct file *file)
 {
-	struct miscdevice *mdev = pfil->private_data;
+	struct miscdevice *mdev = file->private_data;
 	struct simtemp_data *sdat = container_of(mdev, struct simtemp_data, miscdev);
 
-	pfil->private_data = sdat;
+	file->private_data = sdat;
 
 	return 0;
 }
@@ -68,15 +69,15 @@ static int simtemp_open(struct inode *inode, struct file *pfil)
 /**
  * @brief Read function for simtemp character device
  *
- * @param pfil
+ * @param file
  * @param buf
  * @param len
  * @param ppos
  * @return ssize_t
  */
-static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos)
+static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
-	struct simtemp_data *sdat = pfil->private_data;
+	struct simtemp_data *sdat = file->private_data;
 	unsigned long flags;
 	int ret;
 
@@ -87,14 +88,13 @@ static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, lof
 	}
 
 	/* wait for data unless O_NONBLOCK */
-	if (!simtemp_ring_has_data(sdat)) {
-		if (pfil->f_flags & O_NONBLOCK)
+	if(!simtemp_rb_has_data(&sdat->rb)) {
+		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
-		if (wait_event_interruptible(sdat->wq, simtemp_ring_has_data(sdat)))
+		if (wait_event_interruptible(sdat->read_queue, simtemp_rb_has_data(&sdat->rb)))
 			return -ERESTARTSYS;
 	}
-
-	ret = simtemp_ring_pop(sdat, &sdat->last_sample);
+	ret = simtemp_rb_pop(&sdat->rb, &sdat->last_sample);
 	if (ret)
 		return 0;
 
@@ -115,20 +115,20 @@ static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, lof
 /**
  * @brief Poll function for simtemp character device
  *
- * @param pfil
+ * @param file
  * @param wait
  * @return __poll_t
  */
-static __poll_t simtemp_poll(struct file *pfil, poll_table *wait)
+static __poll_t simtemp_poll(struct file *file, poll_table *wait)
 {
-	struct simtemp_data *sdat = pfil->private_data;
+	struct simtemp_data *sdat = file->private_data;
 	unsigned long flags;
 	__poll_t mask = 0;
 
-	poll_wait(pfil, &sdat->wq, wait);
+	poll_wait(file, &sdat->read_queue, wait);
 
 	spin_lock_irqsave(&sdat->lock, flags);
-	if (simtemp_ring_has_data(sdat))
+	if (simtemp_rb_has_data(&sdat->rb))
 		mask |= POLLIN | POLLRDNORM;
 
 	if (sdat->last_sample.flags & SIMTEMP_FLAG_THRESHOLD_CROSSED)

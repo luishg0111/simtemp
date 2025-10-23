@@ -29,8 +29,7 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
-#define INITIAL_TEMPERATURE_mC 42000 /* 42.000 °C */
-#define INITIAL_COUNTER 0ULL
+
 /*******************************************************************************
  * Types
  ******************************************************************************/
@@ -79,8 +78,6 @@ static struct platform_driver simtemp_driver = {
 static int simtemp_probe(struct platform_device *pdev)
 {
 	struct simtemp_data *sdat;
-	u32 sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
-	u32 threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 	int ret = 0;
 
 	dev_info(&pdev->dev, "Compatible driver detected. Initializing resources...\n");
@@ -94,28 +91,36 @@ static int simtemp_probe(struct platform_device *pdev)
 
 	/* Optional DT: read sampling-ms / threshold-mC if present */
 	if (pdev->dev.of_node) {
-		of_property_read_u32(pdev->dev.of_node, "sampling-ms", &sampling_ms);
-		of_property_read_u32(pdev->dev.of_node, "threshold-mC", &sdat->threshold_mc);
+		of_property_read_u32(pdev->dev.of_node, "sampling-ms", &sdat->last_sample.sampling_ms);
+		of_property_read_s32(pdev->dev.of_node, "threshold-mC", &sdat->last_sample.threshold_mc);
 	}
-
+	
 	/* ensure sensible defaults if DT helper left them zero/uninitialized */
-	if (sdat->sampling_ms == 0)
-		sdat->sampling_ms = sampling_ms;
+	if (sdat->last_sample.sampling_ms == 0)
+		sdat->last_sample.sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
 
-	if (sdat->threshold_mc == 0)
-		sdat->threshold_mc = threshold_mc;
+	if (sdat->last_sample.threshold_mc == 0)
+		sdat->last_sample.threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
+	
+	if (sdat->last_sample.temp_mc == 0)
+		sdat->last_sample.temp_mc = SIMTEMP_DEFAULT_TEMPERATURE_MC;
 
-	/* initialize basic fields (lock, initial temp, counters) */
-	spin_lock_init(&sdat->lock);
-	sdat->temp_mc = INITIAL_TEMPERATURE_mC;
-	sdat->count = INITIAL_COUNTER;
+	if (sdat->last_sample.timestamp_ns == 0)
+		sdat->last_sample.timestamp_ns = SIMTEMP_DEFAULT_TIMESTAMP_NS;
+
+	spin_lock_init(&sdat->rb.lock);
+	init_waitqueue_head(&sdat->read_queue);
+
+	/* Create dedicated workqueue */
+	sdat->wq = alloc_workqueue("simtemp_wq", WQ_UNBOUND, 1);
+	//INIT_WORK(&sdat->work, wake_up_interruptible(&sdat->read_queue));
 
 	/* store sampling period in ktime in hr timer init, submodule will use sampling_ms */
-	dev_info(&pdev->dev, "%s: config sampling_ms=%u threshold_mc=%u\n",
-		 DRIVER_NAME, sdat->sampling_ms, sdat->threshold_mc);
+	dev_info(&pdev->dev, "%s: config sampling_ms=%u threshold_mc=%d\n",
+		 DRIVER_NAME, sdat->last_sample.sampling_ms, sdat->last_sample.threshold_mc);
 
 	/* 1) Initialize sampling engine (hrtimer) */
-	ret = simtemp_hrtimer_init(sdat, sdat->sampling_ms);
+	ret = simtemp_hrtimer_init(sdat, sdat->last_sample.sampling_ms);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: failed to init hrtimer (%d)\n", DRIVER_NAME, ret);
 		return ret; /* devm allocation -> no explicit free */
@@ -140,7 +145,7 @@ static int simtemp_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, sdat);
 
 	dev_info(&pdev->dev, "%s: probe successful\n (sampling=%u ms)\n", DRIVER_NAME,
-		 sdat->sampling_ms);
+		 sdat->last_sample.sampling_ms);
 	return ret;
 }
 
@@ -153,6 +158,9 @@ static int simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_data *sdat = platform_get_drvdata(pdev);
 
+	cancel_work_sync(&sdat->work);
+	destroy_workqueue(sdat->wq);
+
 	/* Remove sysfs */
 	simtemp_sysfs_exit(sdat);
 
@@ -162,8 +170,7 @@ static int simtemp_remove(struct platform_device *pdev)
 	/* Remove hrtimer */
 	simtemp_hrtimer_exit(sdat);
 
-	dev_info(&pdev->dev, "%s: removed cleanly (total samples=%llu)\n", DRIVER_NAME,
-		 (unsigned long long)sdat->total_samples);
+	dev_info(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
 
 	return 0;
 }

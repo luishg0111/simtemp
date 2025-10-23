@@ -58,7 +58,7 @@ static ssize_t sampling_ms_show(struct device *dev,
 {
 	struct simtemp_data *sdat = dev_get_drvdata(dev);
 
-	return sysfs_emit(buf, "%u\n", sdat->sampling_ms);
+	return sysfs_emit(buf, "%u\n", sdat->last_sample.sampling_ms);
 }
 
 /**
@@ -86,7 +86,7 @@ static ssize_t sampling_ms_store(struct device *dev,
 		return -EINVAL;
 
 	dev_info(sdat->dev, "sampling_ms updated to %u ms\n",
-		 sdat->sampling_ms);
+		 sdat->last_sample.sampling_ms);
 
 	return count;
 }
@@ -105,7 +105,7 @@ static ssize_t threshold_mc_show(struct device *dev,
 {
 	struct simtemp_data *sdat = dev_get_drvdata(dev);
 
-	return sysfs_emit(buf, "%u\n", sdat->threshold_mc);
+	return sysfs_emit(buf, "%u\n", sdat->last_sample.threshold_mc);
 }
 
 /**
@@ -135,10 +135,10 @@ static ssize_t threshold_mc_store(struct device *dev,
 	}
 
 	spin_lock(&sdat->lock);
-	sdat->threshold_mc = new_thr;
+	sdat->last_sample.threshold_mc = new_thr;
 	spin_unlock(&sdat->lock);
 
-	dev_info(sdat->dev, "threshold_mc updated to %u\n", sdat->threshold_mc);
+	dev_info(sdat->dev, "threshold_mc updated to %d\n", sdat->last_sample.threshold_mc);
 
 	return count;
 }
@@ -224,9 +224,9 @@ static ssize_t stats_show(struct device *dev,
 	struct simtemp_data *sdat = dev_get_drvdata(dev);
 
 	return sysfs_emit(buf, "Updates: %lu\nAlerts: %lu\nErrors: %lu\n",
-			  sdat->stats.update_count,
-			  sdat->stats.alert_count,
-			  sdat->stats.error_count);
+			  sdat->stats.updates_count,
+			  sdat->stats.alerts_count,
+			  sdat->stats.errors_count);
 }
 static DEVICE_ATTR_RO(stats);
 
