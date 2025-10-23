@@ -59,9 +59,9 @@ static const struct file_operations simtemp_fops = {
 static int simtemp_open(struct inode *inode, struct file *file)
 {
 	struct miscdevice *mdev = file->private_data;
-	struct simtemp_data *sdat = container_of(mdev, struct simtemp_data, miscdev);
+	struct simtemp_device *sdev = container_of(mdev, struct simtemp_device, miscdev);
 
-	file->private_data = sdat;
+	file->private_data = sdev;
 
 	return 0;
 }
@@ -77,37 +77,37 @@ static int simtemp_open(struct inode *inode, struct file *file)
  */
 static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
-	struct simtemp_data *sdat = file->private_data;
+	struct simtemp_device *sdev = file->private_data;
 	unsigned long flags;
 	int ret;
 
-	if (len < sizeof(sdat->last_sample)) {
+	if (len < sizeof(sdev->last_sample)) {
 		pr_warn("%s: Read requested size %zu is too small. Expected %zu.\n",
-			DRIVER_NAME, len, sizeof(sdat->last_sample));
+			DRIVER_NAME, len, sizeof(sdev->last_sample));
 		return -EINVAL;
 	}
 
 	/* wait for data unless O_NONBLOCK */
-	if (!simtemp_rb_has_data(&sdat->rb)) {
+	if (!simtemp_rb_has_data(&sdev->rb)) {
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
-		if (wait_event_interruptible(sdat->read_queue, simtemp_rb_has_data(&sdat->rb)))
+		if (wait_event_interruptible(sdev->read_queue, simtemp_rb_has_data(&sdev->rb)))
 			return -ERESTARTSYS;
 	}
-	ret = simtemp_rb_pop(&sdat->rb, &sdat->last_sample);
+	ret = simtemp_rb_pop(&sdev->rb, &sdev->last_sample);
 	if (ret)
 		return 0;
 
-	spin_lock_irqsave(&sdat->lock, flags);
-	if (copy_to_user(buf, &sdat->last_sample, sizeof(sdat->last_sample))) {
-		spin_unlock_irqrestore(&sdat->lock, flags);
+	spin_lock_irqsave(&sdev->rb.lock, flags);
+	if (copy_to_user(buf, &sdev->last_sample, sizeof(sdev->last_sample))) {
+		spin_unlock_irqrestore(&sdev->rb.lock, flags);
 		return -EFAULT;
 	}
-	ret = sizeof(sdat->last_sample);
+	ret = sizeof(sdev->last_sample);
 
 	/* Clear the NEW_SAMPLE flag for the next read/wait cycle */
-	sdat->last_sample.flags &= ~SIMTEMP_FLAG_NEW_SAMPLE;
-	spin_unlock_irqrestore(&sdat->lock, flags);
+	sdev->last_sample.flags &= ~SIMTEMP_FLAG_NEW_SAMPLE;
+	spin_unlock_irqrestore(&sdev->rb.lock, flags);
 
 	return ret;
 }
@@ -121,19 +121,19 @@ static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, lof
  */
 static __poll_t simtemp_poll(struct file *file, poll_table *wait)
 {
-	struct simtemp_data *sdat = file->private_data;
+	struct simtemp_device *sdev = file->private_data;
 	unsigned long flags;
 	__poll_t mask = 0;
 
-	poll_wait(file, &sdat->read_queue, wait);
+	poll_wait(file, &sdev->read_queue, wait);
 
-	spin_lock_irqsave(&sdat->lock, flags);
-	if (simtemp_rb_has_data(&sdat->rb))
+	spin_lock_irqsave(&sdev->rb.lock, flags);
+	if (simtemp_rb_has_data(&sdev->rb))
 		mask |= POLLIN | POLLRDNORM;
 
-	if (sdat->last_sample.flags & SIMTEMP_FLAG_THRESHOLD_CROSSED)
+	if (sdev->last_sample.flags & SIMTEMP_FLAG_THRESHOLD_CROSSED)
 		mask |= POLLPRI;
-	spin_unlock_irqrestore(&sdat->lock, flags);
+	spin_unlock_irqrestore(&sdev->rb.lock, flags);
 
 	return mask;
 }
@@ -141,24 +141,24 @@ static __poll_t simtemp_poll(struct file *file, poll_table *wait)
 /**
  * @brief Initialize the simtemp character device
  *
- * @param sdat
+ * @param sdev
  * @return int
  */
-int simtemp_char_init(struct simtemp_data *sdat)
+int simtemp_char_init(struct simtemp_device *sdev)
 {
 	int ret;
 
-	sdat->miscdev.minor = MISC_DYNAMIC_MINOR;
-	sdat->miscdev.name  = DEVICE_NAME;
-	sdat->miscdev.fops  = &simtemp_fops;
+	sdev->miscdev.minor = MISC_DYNAMIC_MINOR;
+	sdev->miscdev.name  = DEVICE_NAME;
+	sdev->miscdev.fops  = &simtemp_fops;
 
-	ret = misc_register(&sdat->miscdev);
+	ret = misc_register(&sdev->miscdev);
 	if (ret) {
-		dev_err(sdat->dev, "failed to register misc device: %d\n", ret);
+		dev_err(sdev->dev, "failed to register misc device: %d\n", ret);
 		return ret;
 	}
 
-	dev_info(sdat->dev, "simtemp char device ready: /dev/%s\n", sdat->miscdev.name);
+	dev_info(sdev->dev, "simtemp char device ready: /dev/%s\n", sdev->miscdev.name);
 
 	return ret;
 }
@@ -167,10 +167,10 @@ EXPORT_SYMBOL_GPL(simtemp_char_init);
 /**
  * @brief Clean up the simtemp character device
  *
- * @param sdat
+ * @param sdev
  */
-void simtemp_char_exit(struct simtemp_data *sdat)
+void simtemp_char_exit(struct simtemp_device *sdev)
 {
-	misc_deregister(&sdat->miscdev);
+	misc_deregister(&sdev->miscdev);
 }
 EXPORT_SYMBOL_GPL(simtemp_char_exit);

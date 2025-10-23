@@ -29,8 +29,8 @@
  /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-int simtemp_hrtimer_init(struct simtemp_data *sdat, u32 sampling_ms);
-void simtemp_hrtimer_exit(struct simtemp_data *sdat);
+int simtemp_hrtimer_init(struct simtemp_device *sdev, u32 sampling_ms);
+void simtemp_hrtimer_exit(struct simtemp_device *sdev);
  /*******************************************************************************
  * Variables
  ******************************************************************************/

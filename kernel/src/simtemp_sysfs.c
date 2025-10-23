@@ -38,6 +38,7 @@ static ssize_t threshold_mc_show(struct device *dev, struct device_attribute *at
 static ssize_t threshold_mc_store(struct device *dev, struct device_attribute *attr,
 				  const char *buf, size_t count);
 static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf);
+static ssize_t record_format_show(struct device *dev, struct device_attribute *attr, char *buf);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -56,9 +57,14 @@ static ssize_t stats_show(struct device *dev, struct device_attribute *attr, cha
 static ssize_t sampling_ms_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
+	ssize_t ret;
 
-	return sysfs_emit(buf, "%u\n", sdat->last_sample.sampling_ms);
+	mutex_lock(&sdev->device_mutex);
+	ret = sysfs_emit(buf, "%u\n", sdev->sampling_ms);
+	mutex_unlock(&sdev->device_mutex);
+
+	return ret;
 }
 
 /**
@@ -74,19 +80,31 @@ static ssize_t sampling_ms_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
 	u32 new_ms;
 	int ret;
+	unsigned long devflags;
 
 	ret = kstrtou32(buf, 0, &new_ms);
 	if (ret)
 		return ret;
 
-	if (new_ms == 0 || new_ms > 10000)
+	if (new_ms == 0 || new_ms > 10000) {
+		dev_warn(dev, "sampling_ms (period) out of range (0 to 10000 ms).\n");
 		return -EINVAL;
+	}
 
-	dev_info(sdat->dev, "sampling_ms updated to %u ms\n",
-		 sdat->last_sample.sampling_ms);
+	/* protect concurrent access with hrtimer */
+	spin_lock_irqsave(&sdev->device_lock, devflags);
+	sdev->sampling_ms = new_ms;
+	spin_unlock_irqrestore(&sdev->device_lock, devflags);
+
+	/* reprogram timer outside lock */
+	hrtimer_cancel(&sdev->timer);
+	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
+
+	dev_info(sdev->dev, "sampling_ms updated to %u ms\n",
+		 sdev->sampling_ms);
 
 	return count;
 }
@@ -103,9 +121,14 @@ static DEVICE_ATTR_RW(sampling_ms);
 static ssize_t threshold_mc_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
+	ssize_t ret;
 
-	return sysfs_emit(buf, "%u\n", sdat->last_sample.threshold_mc);
+	mutex_lock(&sdev->device_mutex);
+	ret = sysfs_emit(buf, "%u\n", sdev->threshold_mc);
+	mutex_unlock(&sdev->device_mutex);
+
+	return ret;
 }
 
 /**
@@ -121,9 +144,10 @@ static ssize_t threshold_mc_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
 	u32 new_thr;
 	int ret;
+	unsigned long devflags;
 
 	ret = kstrtou32(buf, 0, &new_thr);
 	if (ret)
@@ -134,11 +158,12 @@ static ssize_t threshold_mc_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	spin_lock(&sdat->lock);
-	sdat->last_sample.threshold_mc = new_thr;
-	spin_unlock(&sdat->lock);
+	/* protect concurrent access with hrtimer */
+	spin_lock_irqsave(&sdev->device_lock, devflags);
+	sdev->threshold_mc = new_thr;
+	spin_unlock_irqrestore(&sdev->device_lock, devflags);
 
-	dev_info(sdat->dev, "threshold_mc updated to %d\n", sdat->last_sample.threshold_mc);
+	dev_info(sdev->dev, "threshold_mc updated to %d\n", sdev->threshold_mc);
 
 	return count;
 }
@@ -155,10 +180,11 @@ static DEVICE_ATTR_RW(threshold_mc);
 static ssize_t mode_show(struct device *dev,
 			 struct device_attribute *attr, char *buf)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
 	const char *mode_str;
+	ssize_t ret;
 
-	switch (sdat->mode) {
+	switch (sdev->mode) {
 	case NORMAL:
 		mode_str = "normal\n";
 		break;
@@ -173,7 +199,11 @@ static ssize_t mode_show(struct device *dev,
 		break;
 	}
 
-	return sprintf(buf, "%s", mode_str);
+	mutex_lock(&sdev->device_mutex);
+	ret = sysfs_emit(buf, "%s", mode_str);
+	mutex_unlock(&sdev->device_mutex);
+
+	return ret;
 }
 
 /**
@@ -188,7 +218,7 @@ static ssize_t mode_show(struct device *dev,
 static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t count)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
 	enum simtemp_mode new_mode;
 
 	if (sysfs_streq(buf, "normal\n")) {
@@ -202,9 +232,9 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 		return -EINVAL;
 	}
 
-	spin_lock(&sdat->lock);
-	sdat->mode = new_mode;
-	spin_unlock(&sdat->lock);
+	mutex_lock(&sdev->device_mutex);
+	sdev->mode = new_mode;
+	mutex_lock(&sdev->device_mutex);
 
 	return count;
 }
@@ -221,14 +251,35 @@ static DEVICE_ATTR_RW(mode);
 static ssize_t stats_show(struct device *dev,
 			  struct device_attribute *attr, char *buf)
 {
-	struct simtemp_data *sdat = dev_get_drvdata(dev);
+	struct simtemp_device *sdev = dev_get_drvdata(dev);
+	ssize_t ret;
 
-	return sysfs_emit(buf, "Updates: %lu\nAlerts: %lu\nErrors: %lu\n",
-			  sdat->stats.updates_count,
-			  sdat->stats.alerts_count,
-			  sdat->stats.errors_count);
+	mutex_lock(&sdev->device_mutex);
+	ret = sysfs_emit(buf, "Updates: %lu\nAlerts: %lu\nErrors: %lu\n",
+			 sdev->stats.updates_count,
+			 sdev->stats.alerts_count,
+			 sdev->stats.errors_count);
+	mutex_unlock(&sdev->device_mutex);
+
+	return ret;
 }
 static DEVICE_ATTR_RO(stats);
+
+/**
+ * @brief Binary format description for record_format attribute
+ *
+ * @param dev
+ * @param attr
+ * @param buf
+ * @return ssize_t
+ */
+static ssize_t record_format_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	/* Describe the binary layout of struct simtemp_sample */
+	return sysfs_emit(buf, "timestamp_ns:u64 temp_mC:s32 flags:u32\n");
+}
+static DEVICE_ATTR_RO(record_format);
 
 /* sysfs attributes */
 static struct attribute *simtemp_attrs[] = {
@@ -236,6 +287,7 @@ static struct attribute *simtemp_attrs[] = {
 	&dev_attr_threshold_mc.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_stats.attr,
+	&dev_attr_record_format.attr,
 	NULL,
 };
 
@@ -246,35 +298,35 @@ static const struct attribute_group simtemp_attr_group = {
 /**
  * @brief Initialize sysfs attributes
  *
- * @param sdat
+ * @param sdev
  * @return int
  */
-int simtemp_sysfs_init(struct simtemp_data *sdat)
+int simtemp_sysfs_init(struct simtemp_device *sdev)
 {
-	int ret;
-	struct device *dev = sdat->dev;
+	struct device *dev = sdev->dev;
+	int ret = 0;
 
 	ret = sysfs_create_group(&dev->kobj, &simtemp_attr_group);
 	if (ret) {
 		dev_err(dev, "failed to create sysfs group\n");
 		return ret;
 	}
-	dev_set_drvdata(dev, sdat);
-	sdat->dev = dev;
+	dev_set_drvdata(dev, sdev);
+	sdev->dev = dev;
 	dev_info(dev, "sysfs attributes created under /sys/class/.../simtemp\n");
 
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_init);
 
 /**
  * @brief Clean up sysfs attributes
  *
- * @param sdat
+ * @param sdev
  */
-void simtemp_sysfs_exit(struct simtemp_data *sdat)
+void simtemp_sysfs_exit(struct simtemp_device *sdev)
 {
-	if (sdat->dev)
-		sysfs_remove_group(&sdat->dev->kobj, &simtemp_attr_group);
+	if (sdev->dev)
+		sysfs_remove_group(&sdev->dev->kobj, &simtemp_attr_group);
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_exit);

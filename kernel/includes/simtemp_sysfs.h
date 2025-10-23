@@ -28,8 +28,8 @@
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-int simtemp_sysfs_init(struct simtemp_data *sdat);
-void simtemp_sysfs_exit(struct simtemp_data *sdat);
+int simtemp_sysfs_init(struct simtemp_device *sdev);
+void simtemp_sysfs_exit(struct simtemp_device *sdev);
 
 /*******************************************************************************
  * Variables

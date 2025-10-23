@@ -41,6 +41,28 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
 /*******************************************************************************
  * Code
  ******************************************************************************/
+static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp)
+{
+	s32 noise;
+	/* mode-specific behavior */
+	switch (mode) {
+	case NORMAL:
+		/* no additional behavior */
+		break;
+	case NOISY:
+		/* larger random variation: [-500, +500] m°C */
+		noise = (s32)(get_random_u32() % 1001) - 500;
+		temp += noise;
+		break;
+	case RAMP:
+		/* increase temperature by 100 m°C per sample */
+		temp += 100;
+		break;
+	default:
+		/* unknown mode, log error and use NORMAL behavior */
+		break;
+	}
+}
 
 /**
  * @brief Timer callback function to generate and push temperature samples
@@ -50,42 +72,54 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
  */
 static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 {
-	struct simtemp_data *sdat = container_of(timer, struct simtemp_data, timer);
+	struct simtemp_device *sdev = container_of(timer, struct simtemp_device, timer);
 	struct simtemp_sample sample;
-	s32 noise;
-	u32 flags = 0;
+	enum simtemp_mode mode;
+	s32 threshold, temp;
+	u32 sflags = SIMTEMP_FLAG_NEW_SAMPLE;
+	unsigned long devflags;
+	unsigned long rbflags;
 
-	/* simulate small random variation: [-150, +150] m°C */
-	noise = (s32)(get_random_u32() % 301) - 150;
+	/* Access configuration under lock */
+	spin_lock_irqsave(&sdev->device_lock, devflags);
+	temp = sdev->last_sample.temp_mc;
+	threshold = sdev->threshold_mc;
+	mode = sdev->mode;
+	spin_unlock_irqrestore(&sdev->device_lock, devflags);
+
+	temp_sample_behavior(mode, &temp);
 
 	/* update current temperature */
-	spin_lock(&sdat->lock);
-	sdat->last_sample.temp_mc += noise;
-	spin_unlock(&sdat->lock);
-
-	/* fill sample */
 	sample.timestamp_ns = ktime_get_ns();
-	sample.temp_mc = sdat->last_sample.temp_mc;
-	sample.sampling_ms = sdat->last_sample.sampling_ms;
-	sample.threshold_mc = sdat->last_sample.threshold_mc;
+	sample.temp_mc      = temp;
+	sample.flags        = sflags;
+
+	/* Update global state and stats */
+	spin_lock_irqsave(&sdev->device_lock, devflags);
+	sdev->last_sample = sample;
+	sdev->stats.updates_count++;
 
 	/* check threshold */
-	if ((u32)sample.temp_mc >= sdat->last_sample.threshold_mc) {
-		flags |= SIMTEMP_FLAG_THRESHOLD_CROSSED;
-		wake_up_poll(&sdat->read_queue, POLLIN | POLLRDNORM | POLLPRI);
+	if (temp >= sdev->threshold_mc) {
+		sdev->stats.alerts_count++;
+		sflags |= SIMTEMP_FLAG_THRESHOLD_CROSSED;
+		sdev->stats.alert_pending = true;
+		wake_up_poll(&sdev->read_queue, POLLIN | POLLRDNORM | POLLPRI);
 	} else {
 		/* clear threshold crossed flag if condition no longer met */
-		flags &= ~SIMTEMP_FLAG_THRESHOLD_CROSSED;
-		wake_up_poll(&sdat->read_queue, POLLIN | POLLRDNORM);
+		sflags &= ~SIMTEMP_FLAG_THRESHOLD_CROSSED;
+		wake_up_poll(&sdev->read_queue, POLLIN | POLLRDNORM);
 	}
-	sample.flags = flags | SIMTEMP_FLAG_NEW_SAMPLE;
+	sample.flags = sflags;
+	spin_lock_irqsave(&sdev->rb.lock, rbflags);
+	spin_unlock_irqrestore(&sdev->device_lock, devflags);
 
 	/* push into ring buffer */
-	simtemp_rb_push(&sdat->rb, &sample);
+	simtemp_rb_push(&sdev->rb, &sample);
 	/* notifies to workqueue*/
-	queue_work(sdat->wq, &sdat->work);
+	queue_work(sdev->wq, &sdev->work);
 	/* forward the timer and restart */
-	hrtimer_forward_now(&sdat->timer, sdat->last_sample.sampling_ms);
+	hrtimer_forward_now(&sdev->timer, ms_to_ktime(sdev->sampling_ms));
 
 	return HRTIMER_RESTART;
 }
@@ -93,16 +127,22 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 /**
  * @brief Initialize hrtimer
  *
- * @param sdat
+ * @param sdev
  * @param sampling_ms
  * @return int
  */
-int simtemp_hrtimer_init(struct simtemp_data *sdat, u32 sampling_ms)
+int simtemp_hrtimer_init(struct simtemp_device *sdev, u32 sampling_ms)
 {
-	sdat->last_sample.sampling_ms = ktime_set(0, sampling_ms * 1000000LL);
-	hrtimer_init(&sdat->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	sdat->timer.function = simtemp_timer_callback;
-	hrtimer_start(&sdat->timer, ms_to_ktime(sdat->last_sample.sampling_ms), HRTIMER_MODE_REL);
+	/* Init ringbuff */
+	spin_lock_init(&sdev->rb.lock);
+	sdev->rb.head = 0;
+	sdev->rb.tail = 0;
+
+	hrtimer_init(&sdev->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	sdev->timer.function = simtemp_timer_callback;
+	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
+
+	pr_info("%s: hrtimer started (%u ms)\n", DRIVER_NAME, sdev->sampling_ms);
 
 	return 0;
 }
@@ -111,10 +151,10 @@ EXPORT_SYMBOL_GPL(simtemp_hrtimer_init);
 /**
  * @brief Stop and clean up hrtimer
  *
- * @param sdat
+ * @param sdev
  */
-void simtemp_hrtimer_exit(struct simtemp_data *sdat)
+void simtemp_hrtimer_exit(struct simtemp_device *sdev)
 {
-	hrtimer_cancel(&sdat->timer);
+	hrtimer_cancel(&sdev->timer);
 }
 EXPORT_SYMBOL_GPL(simtemp_hrtimer_exit);

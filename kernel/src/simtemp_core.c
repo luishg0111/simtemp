@@ -42,6 +42,8 @@ static void __exit simtemp_exit_module(void);
 
 static int simtemp_probe(struct platform_device *pdev);
 static int simtemp_remove(struct platform_device *pdev);
+
+static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -70,6 +72,59 @@ static struct platform_driver simtemp_driver = {
  ******************************************************************************/
 
 /**
+ * @brief Device Tree parsing helper
+ *
+ * @param sdev
+ * @param dev
+ * @return int
+ */
+static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	u32 tmp;
+
+	if (!np) {
+		dev_info(dev, "no Device Tree node found, using defaults\n");
+		sdev->sampling_ms  = SIMTEMP_DEFAULT_SAMPLING_MS;
+		sdev->threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
+		sdev->mode         = SIMTEMP_DEFAULT_MODE;
+		return 0;
+	}
+
+	dev_info(dev, "parsing Device Tree properties\n");
+
+	if (!of_property_read_u32(np, "sampling-ms", &tmp)) {
+		sdev->sampling_ms = tmp;
+	} else {
+		sdev->sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
+		dev_warn(dev, "sampling-ms not found, using default %u ms\n",
+			 sdev->sampling_ms);
+	}
+
+	if (!of_property_read_s32(np, "threshold-mC", &tmp)) {
+		sdev->threshold_mc = tmp;
+	} else {
+		sdev->threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
+		dev_warn(dev, "threshold-mC not found, using default %u mC\n",
+			 sdev->threshold_mc);
+	}
+
+	if (!of_property_read_u32(np, "mode", &tmp)) {
+		sdev->mode = tmp;
+	} else {
+		sdev->mode = SIMTEMP_DEFAULT_MODE;
+		dev_warn(dev, "mode not found, using default %u mC\n",
+			 sdev->mode);
+	}
+
+	dev_info(dev,
+		 "DT config: sampling=%u ms, threshold=%u mC, mode=%u\n",
+		 sdev->sampling_ms, sdev->threshold_mc, sdev->mode);
+
+	return 0;
+}
+
+/**
  * @brief Platform driver probe function
  *
  * @param pdev
@@ -77,77 +132,55 @@ static struct platform_driver simtemp_driver = {
  */
 static int simtemp_probe(struct platform_device *pdev)
 {
-	struct simtemp_data *sdat;
-	int ret = 0;
+	struct simtemp_device *sdev;
+	int ret;
 
 	dev_info(&pdev->dev, "Compatible driver detected. Initializing resources...\n");
 
-	sdat = devm_kzalloc(&pdev->dev, sizeof(*sdat), GFP_KERNEL);
-	if (!sdat)
+	sdev = devm_kzalloc(&pdev->dev, sizeof(*sdev), GFP_KERNEL);
+	if (!sdev)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, sdat);
-	sdat->dev = &pdev->dev;
+	sdev->dev = &pdev->dev;
+	/* store pointer for remove path */
+	platform_set_drvdata(pdev, sdev);
 
-	/* Optional DT: read sampling-ms / threshold-mC if present */
-	if (pdev->dev.of_node) {
-		of_property_read_u32(pdev->dev.of_node, "sampling-ms",
-				     &sdat->last_sample.sampling_ms);
-		of_property_read_s32(pdev->dev.of_node, "threshold-mC",
-				     &sdat->last_sample.threshold_mc);
-	}
+	/* Parse DT or defaults */
+	ret = simtemp_parse_dt(sdev, &pdev->dev);
+	if (ret)
+		return ret;
 
-	/* ensure sensible defaults if DT helper left them zero/uninitialized */
-	if (sdat->last_sample.sampling_ms == 0)
-		sdat->last_sample.sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
-
-	if (sdat->last_sample.threshold_mc == 0)
-		sdat->last_sample.threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
-
-	if (sdat->last_sample.temp_mc == 0)
-		sdat->last_sample.temp_mc = SIMTEMP_DEFAULT_TEMPERATURE_MC;
-
-	if (sdat->last_sample.timestamp_ns == 0)
-		sdat->last_sample.timestamp_ns = SIMTEMP_DEFAULT_TIMESTAMP_NS;
-
-	spin_lock_init(&sdat->rb.lock);
-	init_waitqueue_head(&sdat->read_queue);
+	spin_lock_init(&sdev->rb.lock);
+	spin_lock_init(&sdev->device_lock);
+	mutex_init(&sdev->device_mutex);
+	init_waitqueue_head(&sdev->read_queue);
 
 	/* Create dedicated workqueue */
-	sdat->wq = alloc_workqueue("simtemp_wq", WQ_UNBOUND, 1);
-	//INIT_WORK(&sdat->work, wake_up_interruptible(&sdat->read_queue));
+	sdev->wq = alloc_workqueue("simtemp_wq", WQ_UNBOUND, 1);
+	//INIT_WORK(&sdev->work, wake_up_interruptible(&sdev->read_queue));
 
-	/* store sampling period in ktime in hr timer init, submodule will use sampling_ms */
-	dev_info(&pdev->dev, "%s: config sampling_ms=%u threshold_mc=%d\n",
-		 DRIVER_NAME, sdat->last_sample.sampling_ms, sdat->last_sample.threshold_mc);
-
-	/* 1) Initialize sampling engine (hrtimer) */
-	ret = simtemp_hrtimer_init(sdat, sdat->last_sample.sampling_ms);
+	/* Initialize modules */
+	ret = simtemp_hrtimer_init(sdev, sdev->sampling_ms);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: failed to init hrtimer (%d)\n", DRIVER_NAME, ret);
 		return ret; /* devm allocation -> no explicit free */
 	}
 
-	/* 2) Initialize char device (/dev/simtemp) */
-	ret = simtemp_char_init(sdat);
+	ret = simtemp_char_init(sdev);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: failed to init char device (%d)\n", DRIVER_NAME, ret);
-		simtemp_hrtimer_exit(sdat);
+		simtemp_hrtimer_exit(sdev);
 	}
 
-	/* 3) Initialize sysfs attributes */
-	ret = simtemp_sysfs_init(sdat);
+	ret = simtemp_sysfs_init(sdev);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: failed to create sysfs attributes (%d)\n",
 			DRIVER_NAME, ret);
-		simtemp_char_exit(sdat);
+		simtemp_char_exit(sdev);
 	}
 
-	/* store pointer for remove path */
-	platform_set_drvdata(pdev, sdat);
-
 	dev_info(&pdev->dev, "%s: probe successful\n (sampling=%u ms)\n", DRIVER_NAME,
-		 sdat->last_sample.sampling_ms);
+		 sdev->sampling_ms);
 	return ret;
 }
 
@@ -158,19 +191,18 @@ static int simtemp_probe(struct platform_device *pdev)
  */
 static int simtemp_remove(struct platform_device *pdev)
 {
-	struct simtemp_data *sdat = platform_get_drvdata(pdev);
+	struct simtemp_device *sdev = platform_get_drvdata(pdev);
 
-	cancel_work_sync(&sdat->work);
-	destroy_workqueue(sdat->wq);
+	dev_info(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
 
+	cancel_work_sync(&sdev->work);
+	destroy_workqueue(sdev->wq);
 	/* Remove sysfs */
-	simtemp_sysfs_exit(sdat);
-
+	simtemp_sysfs_exit(sdev);
 	/* Remove char device */
-	simtemp_char_exit(sdat);
-
+	simtemp_char_exit(sdev);
 	/* Remove hrtimer */
-	simtemp_hrtimer_exit(sdat);
+	simtemp_hrtimer_exit(sdev);
 
 	dev_info(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
 
@@ -184,23 +216,20 @@ static int simtemp_remove(struct platform_device *pdev)
  */
 static int __init simtemp_init_module(void)
 {
-	int ret = 0;
+	int ret;
 
+	/* Info the manually created platform device*/
 	struct platform_device_info pdevinfo = {
-		.name = "nxp_simtemp", /* must match .compatible in your DT table */
-		.id = -1,
+		.name = "nxp_simtemp", /* must match driver name*/
+		.id = PLATFORM_DEVID_NONE,
 	};
 
 	pr_info("%s: registering manual platform device\n", DRIVER_NAME);
-
-	/* Register the platform_driver (your main driver) */
 	ret = platform_driver_register(&simtemp_driver);
-	if (ret) {
-		pr_err("%s: failed to register platform driver: %d\n", DRIVER_NAME, ret);
+	if (ret)
 		return ret;
-	}
 
-	/* Create a fake platform_device */
+	/*create a fake platform device so probe() runs even without DT */
 	simtemp_pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(simtemp_pdev)) {
 		pr_err("%s: failed to register platform device\n", DRIVER_NAME);
@@ -220,8 +249,14 @@ static int __init simtemp_init_module(void)
 static void __exit simtemp_exit_module(void)
 {
 	pr_info("%s: unregistering driver and device\n", DRIVER_NAME);
+
+	if (simtemp_pdev)
+		platform_device_unregister(simtemp_pdev);
+
 	platform_driver_unregister(&simtemp_driver);
-	platform_device_unregister(simtemp_pdev);
+	kfree(simtemp_pdev);
+
+	pr_info("%s: module exit complete\n", DRIVER_NAME);
 }
 
 module_init(simtemp_init_module);
