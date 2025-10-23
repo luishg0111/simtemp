@@ -70,7 +70,6 @@ static struct platform_driver simtemp_driver = {
 /*******************************************************************************
  * Code
  ******************************************************************************/
-
 /**
  * @brief Device Tree parsing helper
  *
@@ -155,10 +154,6 @@ static int simtemp_probe(struct platform_device *pdev)
 	mutex_init(&sdev->device_mutex);
 	init_waitqueue_head(&sdev->read_queue);
 
-	/* Create dedicated workqueue */
-	sdev->wq = alloc_workqueue("simtemp_wq", WQ_UNBOUND, 1);
-	//INIT_WORK(&sdev->work, wake_up_interruptible(&sdev->read_queue));
-
 	/* Initialize modules */
 	ret = simtemp_hrtimer_init(sdev, sdev->sampling_ms);
 	if (ret) {
@@ -195,8 +190,6 @@ static int simtemp_remove(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
 
-	cancel_work_sync(&sdev->work);
-	destroy_workqueue(sdev->wq);
 	/* Remove sysfs */
 	simtemp_sysfs_exit(sdev);
 	/* Remove char device */

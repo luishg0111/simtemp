@@ -84,8 +84,6 @@ struct simtemp_device {
 	enum simtemp_mode mode;     		/* operating mode */
 
 	struct ring_buffer rb;			/* ring buffer */
-	struct workqueue_struct *wq;		/* workqueue */
-	struct work_struct work;		/* work struct for readers */	
 	wait_queue_head_t read_queue;		/* wait queue for readers */
 
 	struct simtemp_sample last_sample; 	/* last sample read */

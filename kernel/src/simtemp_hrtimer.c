@@ -34,6 +34,7 @@
  ******************************************************************************/
 static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
 
+static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -41,6 +42,12 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *t);
 /*******************************************************************************
  * Code
  ******************************************************************************/
+/**
+ * @brief Apply mode-specific behavior to temperature sample
+ *
+ * @param mode
+ * @param temp
+ */
 static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp)
 {
 	s32 noise;
@@ -116,8 +123,8 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 
 	/* push into ring buffer */
 	simtemp_rb_push(&sdev->rb, &sample);
-	/* notifies to workqueue*/
-	queue_work(sdev->wq, &sdev->work);
+	/* wake-up block events*/
+	wake_up_interruptible(&sdev->read_queue);
 	/* forward the timer and restart */
 	hrtimer_forward_now(&sdev->timer, ms_to_ktime(sdev->sampling_ms));
 

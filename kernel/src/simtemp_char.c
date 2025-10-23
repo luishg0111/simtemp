@@ -48,7 +48,6 @@ static const struct file_operations simtemp_fops = {
 /*******************************************************************************
  * Code
  ******************************************************************************/
-
 /**
  *@brief Open function for simtemp character device
  *
