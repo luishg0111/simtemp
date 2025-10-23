@@ -150,6 +150,7 @@ int simtemp_char_init(struct simtemp_device *sdev)
 	sdev->miscdev.minor = MISC_DYNAMIC_MINOR;
 	sdev->miscdev.name  = DEVICE_NAME;
 	sdev->miscdev.fops  = &simtemp_fops;
+	sdev->miscdev.parent = sdev->dev;
 
 	ret = misc_register(&sdev->miscdev);
 	if (ret) {
