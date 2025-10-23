@@ -51,10 +51,10 @@ static inline unsigned int ring_next(unsigned int i)
 
 /**
  * @brief Check if ring buffer has data
- * 
- * @param rb 
- * @return true 
- * @return false 
+ *
+ * @param rb
+ * @return true
+ * @return false
  */
 bool simtemp_rb_has_data(struct ring_buffer *rb)
 {
@@ -69,8 +69,7 @@ EXPORT_SYMBOL_GPL(simtemp_rb_has_data);
  * @param rb
  * @param sample
  */
-void simtemp_rb_push(struct ring_buffer *rb,
-		       const struct simtemp_sample *sample)
+void simtemp_rb_push(struct ring_buffer *rb, const struct simtemp_sample *sample)
 {
 	unsigned long flags;
 

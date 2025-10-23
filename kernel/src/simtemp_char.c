@@ -88,7 +88,7 @@ static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, lof
 	}
 
 	/* wait for data unless O_NONBLOCK */
-	if(!simtemp_rb_has_data(&sdat->rb)) {
+	if (!simtemp_rb_has_data(&sdat->rb)) {
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 		if (wait_event_interruptible(sdat->read_queue, simtemp_rb_has_data(&sdat->rb)))

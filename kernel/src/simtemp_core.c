@@ -91,17 +91,19 @@ static int simtemp_probe(struct platform_device *pdev)
 
 	/* Optional DT: read sampling-ms / threshold-mC if present */
 	if (pdev->dev.of_node) {
-		of_property_read_u32(pdev->dev.of_node, "sampling-ms", &sdat->last_sample.sampling_ms);
-		of_property_read_s32(pdev->dev.of_node, "threshold-mC", &sdat->last_sample.threshold_mc);
+		of_property_read_u32(pdev->dev.of_node, "sampling-ms",
+				     &sdat->last_sample.sampling_ms);
+		of_property_read_s32(pdev->dev.of_node, "threshold-mC",
+				     &sdat->last_sample.threshold_mc);
 	}
-	
+
 	/* ensure sensible defaults if DT helper left them zero/uninitialized */
 	if (sdat->last_sample.sampling_ms == 0)
 		sdat->last_sample.sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
 
 	if (sdat->last_sample.threshold_mc == 0)
 		sdat->last_sample.threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
-	
+
 	if (sdat->last_sample.temp_mc == 0)
 		sdat->last_sample.temp_mc = SIMTEMP_DEFAULT_TEMPERATURE_MC;
 

@@ -83,7 +83,7 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 	/* push into ring buffer */
 	simtemp_rb_push(&sdat->rb, &sample);
 	/* notifies to workqueue*/
-	queue_work(sdat->wq, &sdat->work); 
+	queue_work(sdat->wq, &sdat->work);
 	/* forward the timer and restart */
 	hrtimer_forward_now(&sdat->timer, sdat->last_sample.sampling_ms);
 
