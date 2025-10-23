@@ -30,6 +30,8 @@
  ******************************************************************************/
 int simtemp_char_init(struct simtemp_data *sdat);
 void simtemp_char_exit(struct simtemp_data *sdat);
+
+bool simtemp_ring_has_data(struct simtemp_data *sdat);
 /*******************************************************************************
  * Variables
  ******************************************************************************/

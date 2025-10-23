@@ -46,7 +46,7 @@
 /* Structure shared with user space */
 struct simtemp_sample{
     __u64 timestamp_ns;     /* timestamp */
-    __s32 temp_mC;          /* milli-degree celsius */
+    __s32 temp_mc;          /* milli-degree celsius */
     __u32 flags;            /* status/event flags */
 } __attribute__((packed));
 
@@ -80,8 +80,8 @@ struct simtemp_data {
     unsigned int count;     /* number of samples present */
     wait_queue_head_t wq;   /* waitqueue for readers */
 
-    int temp_mC;            /* current temperature in milli-degrees C */
-    int threshold_mC;       /* alert threshold (milli-deg C) */
+    int temp_mc;            /* current temperature in milli-degrees C */
+    int threshold_mc;       /* alert threshold (milli-deg C) */
     int sampling_ms;        /* sampling interval (ms) */
     u64 total_samples;
 

@@ -30,7 +30,6 @@
  * Prototypes
  ******************************************************************************/
 int  simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out);
-bool simtemp_ring_has_data(struct simtemp_data *sdat);
 
 static int simtemp_open(struct inode *inode, struct file *pfil);
 static ssize_t simtemp_read(struct file *pfil, char __user *buf, size_t len, loff_t *ppos);

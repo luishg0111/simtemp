@@ -1,12 +1,13 @@
-/**SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0-only
+/**
  * @file simtemp_hrtimer.c
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief Implementation of high-resolution timer for simulated temperature sensor
  * @version 0.1
  * @date 2025-10-15
- * 
+ *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
- * 
+ *
  */
 /*******************************************************************************
  * Includes
@@ -41,11 +42,11 @@ static inline unsigned int ring_next(unsigned int i);
  * Code
  ******************************************************************************/
 /**
-* @brief Advance the ring buffer index
-* 
-* @param i 
-* @return unsigned int 
-*/
+ * @brief Advance the ring buffer index
+ *
+ * @param i
+ * @return unsigned int
+ */
 static inline unsigned int ring_next(unsigned int i)
 {
 	return (i + 1) % RING_BUFF_SIZE;
@@ -60,11 +61,11 @@ EXPORT_SYMBOL_GPL(simtemp_ring_has_data);
 
 /**
  * @brief Push a new sample into the ring buffer
- * 
- * @param sdat 
- * @param sample 
+ *
+ * @param sdat
+ * @param sample
  */
-void simtemp_ring_push(struct simtemp_data *sdat, 
+void simtemp_ring_push(struct simtemp_data *sdat,
 		       const struct simtemp_sample *sample)
 {
 	unsigned long flags;
@@ -83,10 +84,10 @@ void simtemp_ring_push(struct simtemp_data *sdat,
 
 /**
  * @brief Pop a sample from the ring buffer
- * 
- * @param sdat 
- * @param out 
- * @return int 
+ *
+ * @param sdat
+ * @param out
+ * @return int
  */
 int simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out)
 {
@@ -109,9 +110,9 @@ int simtemp_ring_pop(struct simtemp_data *sdat, struct simtemp_sample *out)
 
 /**
  * @brief Timer callback function to generate and push temperature samples
- * 
- * @param timer 
- * @return enum hrtimer_restart 
+ *
+ * @param timer
+ * @return enum hrtimer_restart
  */
 static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 {
@@ -126,23 +127,23 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 
 	/* update current temperature */
 	spin_lock(&sdat->lock);
-	sdat->temp_mC += noise;
+	sdat->temp_mc += noise;
 	sdat->total_samples++;
 	spin_unlock(&sdat->lock);
 
 	count = ++sdat->total_samples;
 	/*Debug output every 10 samples */
 	if (count % 10 == 0)
-	dev_info(sdat->dev, "[simtemp] sample #%llu: %d mC\n",
-		 (unsigned long long)count,
-		 sdat->temp_mC);
+		dev_info(sdat->dev, "[simtemp] sample #%llu: %d mC\n",
+			 (unsigned long long)count,
+			 sdat->temp_mc);
 
 	/* fill sample */
 	sample.timestamp_ns = ktime_get_ns();
-	sample.temp_mC = sdat->temp_mC;
+	sample.temp_mc = sdat->temp_mc;
 
 	/* check threshold */
-	if ((u32)sample.temp_mC >= sdat->threshold_mC)
+	if ((u32)sample.temp_mc >= sdat->threshold_mc)
 		flags |= SIMTEMP_FLAG_THRESHOLD_CROSSED;
 
 	sample.flags = flags | SIMTEMP_FLAG_NEW_SAMPLE;
@@ -157,11 +158,11 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 }
 
 /**
- * @brief Initialize hrtimer 
- * 
- * @param sdat 
- * @param sampling_ms 
- * @return int 
+ * @brief Initialize hrtimer
+ *
+ * @param sdat
+ * @param sampling_ms
+ * @return int
  */
 int simtemp_hrtimer_init(struct simtemp_data *sdat, u32 sampling_ms)
 {
@@ -176,8 +177,8 @@ EXPORT_SYMBOL_GPL(simtemp_hrtimer_init);
 
 /**
  * @brief Stop and clean up hrtimer
- * 
- * @param sdat 
+ *
+ * @param sdat
  */
 void simtemp_hrtimer_exit(struct simtemp_data *sdat)
 {
