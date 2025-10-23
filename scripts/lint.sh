@@ -21,8 +21,6 @@ if [ "${#MISSING[@]}" -ne 0 ]; then
     exit 2
 fi
 
-# Removed local checkpatch.pl reference since it will be run from kernel source
-
 # Prefer the kernel build symlink (if kernel headers/sources are installed this usually points to the correct source tree)
 MOD_BUILD="/lib/modules/$(uname -r)/build/scripts/checkpatch.pl"
 

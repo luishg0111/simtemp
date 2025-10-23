@@ -1,13 +1,13 @@
-/*SPDX-License-Identifier: GPL-2.0-only*/ 
+// SPDX-License-Identifier: GPL-2.0-only
 /**
  * @file simtemp_sysfs.h
  * @author Luis Hernández <luishg0111@gmail.com>
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2025-10-15
- * 
+ *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
- * 
+ *
  */
 #ifndef _SIMTEMP_SYSFS_H_
 #define _SIMTEMP_SYSFS_H_

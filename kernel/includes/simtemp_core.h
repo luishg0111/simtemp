@@ -1,13 +1,13 @@
-/*SPDX-License-Identifier: GPL-2.0-only*/ 
+// SPDX-License-Identifier: GPL-2.0-only
 /**
  * @file simtemp_core.h
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief Virtual simulated temperature sensor driver
  * @version 0.1
  * @date 2025-10-15
- * 
+ *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
- * 
+ *
  */
 #ifndef _SIMTEMP_CORE_H_
 #define _SIMTEMP_CORE_H_
@@ -45,51 +45,51 @@
  ******************************************************************************/
 /* Structure shared with user space */
 struct simtemp_sample{
-    __u64 timestamp_ns;     /* timestamp */
-    __s32 temp_mc;          /* milli-degree celsius */
-    __u32 flags;            /* status/event flags */
+	__u64 timestamp_ns;     /* timestamp */
+	__s32 temp_mc;          /* milli-degree celsius */
+	__u32 flags;            /* status/event flags */
 } __attribute__((packed));
 
 enum simtemp_mode {
-    NORMAL, /* Default mode */
-    NOISY,  /* Noisy mode */
-    RAMP    /* Ramp mode */
+	NORMAL, /* Default mode */
+	NOISY,  /* Noisy mode */
+	RAMP    /* Ramp mode */
 };
 
 struct ring_buffer {
-    struct simtemp_sample samples[RING_BUFF_SIZE]; /* ring buffer of samples */
-    int head;   /* next write position */
-    int tail;   /* next read position */
-    spinlock_t lock;
+	struct simtemp_sample samples[RING_BUFF_SIZE]; /* ring buffer of samples */
+	int head;   /* next write position */
+	int tail;   /* next read position */
+	spinlock_t lock;
 };
 struct simtemp_stats {
-    unsigned long update_count;
-    unsigned long alert_count;
-    unsigned long error_count;
+	unsigned long update_count;
+	unsigned long alert_count;
+	unsigned long error_count;
 };
 /* Internal device data */
 struct simtemp_data {
-    struct miscdevice miscdev;  /* misc device for /dev/simtemp */
-    struct device *dev;     /* device for dev_info */	
-    struct hrtimer timer;   /* timer */
-    ktime_t period;         /* period */
-      
-    struct simtemp_sample samples[RING_BUFF_SIZE];  
-    unsigned int head;      
-    unsigned int tail;      /* next read position */
-    unsigned int count;     /* number of samples present */
-    wait_queue_head_t wq;   /* waitqueue for readers */
+	struct miscdevice miscdev;  /* misc device for /dev/simtemp */
+	struct device *dev;     /* device for dev_info */
+	struct hrtimer timer;   /* timer */
+	ktime_t period;         /* period */
 
-    int temp_mc;            /* current temperature in milli-degrees C */
-    int threshold_mc;       /* alert threshold (milli-deg C) */
-    int sampling_ms;        /* sampling interval (ms) */
-    u64 total_samples;
+	struct simtemp_sample samples[RING_BUFF_SIZE];
+	unsigned int head;
+	unsigned int tail;      /* next read position */
+	unsigned int count;     /* number of samples present */
+	wait_queue_head_t wq;   /* waitqueue for readers */
 
-    struct simtemp_stats stats; /* statistics */
-    enum simtemp_mode mode;     /* operating mode */
-    
-    struct simtemp_sample last_sample; /* last sample read */
-    spinlock_t lock;        /* sync */
+	int temp_mc;            /* current temperature in milli-degrees C */
+	int threshold_mc;       /* alert threshold (milli-deg C) */
+	int sampling_ms;        /* sampling interval (ms) */
+	u64 total_samples;
+
+	struct simtemp_stats stats; /* statistics */
+	enum simtemp_mode mode;     /* operating mode */
+
+	struct simtemp_sample last_sample; /* last sample read */
+	spinlock_t lock;        /* sync */
 };
 
 /*******************************************************************************
