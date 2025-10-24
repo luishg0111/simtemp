@@ -38,7 +38,6 @@
 #define SIMTEMP_DEFAULT_TEMPERATURE_MC 42000
 #define SIMTEMP_DEFAULT_TIMESTAMP_NS 0ULL
 #define SIMTEMP_DEFAULT_MODE 0 /* NORMAL mode */
-#define SIMTEMP_DEFAULT_STATS {0, 0, 0, false}
 
 /* Global limits for period sampling_ms*/
 #define SIMTEMP_SAMPLING_MS_MAX 10000u
@@ -85,9 +84,9 @@ struct simtemp_stats {
 /* Internal device data */
 struct simtemp_device {
 	struct miscdevice miscdev;		/* misc device for /dev/simtemp */
-	struct device *dev;			/* device for dev_info */
-	struct hrtimer timer;			/* timer */
+	struct device *dev;			/* device for dev_info */	
 
+	struct hrtimer timer;			/* timer */
 	u32 sampling_ms;     			/* sampling interval (ms) */
 	s32 threshold_mc;			/* alert threshold (milli-deg C) */
 	struct simtemp_stats stats; 		/* statistics */
@@ -95,8 +94,8 @@ struct simtemp_device {
 
 	struct ring_buffer rb;			/* ring buffer */
 	wait_queue_head_t read_queue;		/* wait queue for readers */
-
 	struct simtemp_sample last_sample; 	/* last sample read */
+	
 	spinlock_t device_lock;			/* protects critical */
 	struct mutex device_mutex;		/* protects non-critical operation */
 };

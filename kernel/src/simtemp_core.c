@@ -41,7 +41,7 @@ static int __init simtemp_init_module(void);
 static void __exit simtemp_exit_module(void);
 
 static int simtemp_probe(struct platform_device *pdev);
-static int simtemp_remove(struct platform_device *pdev);
+static void simtemp_remove(struct platform_device *pdev);
 
 static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev);
 static const char *simtemp_mode_to_str(enum simtemp_mode mode);
@@ -87,10 +87,14 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 
 	if (!np) {
 		dev_info(dev, "no Device Tree node found, using defaults\n");
-		sdev->sampling_ms  = SIMTEMP_DEFAULT_SAMPLING_MS;
-		sdev->threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
-		sdev->mode         = SIMTEMP_DEFAULT_MODE;
-		sdev->stats        = SIMTEMP_DEFAULT_STATS;
+		sdev->sampling_ms		= SIMTEMP_DEFAULT_SAMPLING_MS;
+		sdev->threshold_mc		= SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
+		sdev->mode			= SIMTEMP_DEFAULT_MODE;
+		/* Initialize stats members */
+		sdev->stats.alerts_count	= 0;
+		sdev->stats.errors_count	= 0;
+		sdev->stats.updates_count	= 0;
+		sdev->stats.alert_pending	= false;
 		return 0;
 	}
 
@@ -136,12 +140,16 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
  */
 static const char *simtemp_mode_to_str(enum simtemp_mode mode)
 {
-    switch (mode) {
-    case SIMTEMP_MODE_NORMAL: return "normal";
-    case SIMTEMP_MODE_NOISY:  return "noisy";
-    case SIMTEMP_MODE_RAMP:   return "ramp";
-    default:                  return "unknown";
-    }
+	switch (mode) {
+	case NORMAL:
+		return "normal";
+	case NOISY:
+		return "noisy";
+	case RAMP:
+		return "ramp";
+	default:
+		return "unknown";
+	}
 }
 
 /**
@@ -202,7 +210,7 @@ static int simtemp_probe(struct platform_device *pdev)
  *
  * @param pdev
  */
-static int simtemp_remove(struct platform_device *pdev)
+static void simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_device *sdev = platform_get_drvdata(pdev);
 
@@ -216,8 +224,6 @@ static int simtemp_remove(struct platform_device *pdev)
 	simtemp_hrtimer_exit(sdev);
 
 	dev_info(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
-
-	return 0;
 }
 
 /**
@@ -240,7 +246,7 @@ static int __init simtemp_init_module(void)
 	if (ret)
 		return ret;
 
-	/*create a fake platform device so probe() runs even without DT */
+	/*create a manual platform device so probe() runs even without DT */
 	simtemp_pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(simtemp_pdev)) {
 		pr_err("%s: failed to register platform device\n", DRIVER_NAME);

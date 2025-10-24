@@ -39,6 +39,7 @@ static ssize_t threshold_mc_store(struct device *dev, struct device_attribute *a
 				  const char *buf, size_t count);
 static ssize_t stats_show(struct device *dev, struct device_attribute *attr, char *buf);
 static ssize_t record_format_show(struct device *dev, struct device_attribute *attr, char *buf);
+
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -46,7 +47,7 @@ static ssize_t record_format_show(struct device *dev, struct device_attribute *a
 /*******************************************************************************
  * Code
  ******************************************************************************/
-  /*
+/*
  * Locking policy:
  *  - simtemp_rb_push() and simtemp_rb_pop() take rb->lock internally.
  *  - simtemp_rb_has_data() is lock-free and safe for concurrent readers.
@@ -324,7 +325,7 @@ int simtemp_sysfs_init(struct simtemp_device *sdev)
 	}
 	dev_set_drvdata(dev, sdev);
 	sdev->dev = dev;
-	dev_info(dev, "sysfs attributes created under /sys/class/.../simtemp\n");
+	dev_info(dev, "sysfs attributes created /sys/class/misc/%s\n", DEVICE_NAME);
 
 	return ret;
 }
@@ -337,7 +338,7 @@ EXPORT_SYMBOL_GPL(simtemp_sysfs_init);
  */
 void simtemp_sysfs_exit(struct simtemp_device *sdev)
 {
-	if (sdev->dev)
-		sysfs_remove_group(&sdev->dev->kobj, &simtemp_attr_group);
+	sysfs_remove_group(&sdev->dev->kobj, &simtemp_attr_group);
+	dev_info(sdev->dev, "sysfs group removed\n");
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_exit);

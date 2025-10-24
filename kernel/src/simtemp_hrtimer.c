@@ -83,9 +83,8 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 	struct simtemp_sample sample;
 	enum simtemp_mode mode;
 	s32 threshold, temp;
-	u32 sflags = SIMTEMP_FLAG_NEW_SAMPLE;
 	unsigned long devflags;
-	unsigned long rbflags;
+	u32 sflags = SIMTEMP_FLAG_NEW_SAMPLE;
 
 	/* Access configuration under lock */
 	spin_lock_irqsave(&sdev->device_lock, devflags);
