@@ -38,6 +38,7 @@ static inline unsigned int ring_next(unsigned int i);
 /*******************************************************************************
  * Code
  ******************************************************************************/
+
 /**
  * @brief Advance the ring buffer index
  *
@@ -58,15 +59,7 @@ static inline unsigned int ring_next(unsigned int i)
  */
 bool simtemp_rb_has_data(struct ring_buffer *rb)
 {
-	unsigned long rbflags;
-	bool has_data;
-
-	/* lockless read; safe enough for wait condition */
-	spin_lock_irqsave(&rb->lock, rbflags);
-	has_data = (rb->head != rb->tail);
-	spin_unlock_irqrestore(&rb->lock, rbflags);
-
-	return has_data;
+	return READ_ONCE(rb->head) != READ_ONCE(rb->tail);
 }
 EXPORT_SYMBOL_GPL(simtemp_rb_has_data);
 
@@ -81,10 +74,13 @@ void simtemp_rb_push(struct ring_buffer *rb, const struct simtemp_sample *sample
 	unsigned long rbflags;
 
 	spin_lock_irqsave(&rb->lock, rbflags);
-	rb->samples[rb->head] = *sample;
-	rb->head = ring_next(rb->head);
+
 	if (rb->head == rb->tail)
 		rb->tail = ring_next(rb->tail); /* buffer full: advance tail */
+
+	rb->samples[rb->head] = *sample;
+	WRITE_ONCE(rb->head, ring_next(rb->head));
+
 	spin_unlock_irqrestore(&rb->lock, rbflags);
 }
 EXPORT_SYMBOL_GPL(simtemp_rb_push);
@@ -102,13 +98,14 @@ int simtemp_rb_pop(struct ring_buffer *rb, struct simtemp_sample *out)
 	int empty;
 
 	spin_lock_irqsave(&rb->lock, rbflags);
-	empty = (rb->head == rb->tail);
+
+	empty = (READ_ONCE(rb->head) == READ_ONCE(rb->tail));
 	if (!empty) {
 		*out = rb->samples[rb->tail];
-		rb->tail = ring_next(rb->tail);
+		WRITE_ONCE(rb->tail, ring_next(rb->tail));
 	}
-	spin_unlock_irqrestore(&rb->lock, rbflags);
 
+	spin_unlock_irqrestore(&rb->lock, rbflags);
 	return empty ? -1 : 0;
 }
 EXPORT_SYMBOL_GPL(simtemp_rb_pop);

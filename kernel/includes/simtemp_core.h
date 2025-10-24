@@ -38,17 +38,22 @@
 #define SIMTEMP_DEFAULT_TEMPERATURE_MC 42000
 #define SIMTEMP_DEFAULT_TIMESTAMP_NS 0ULL
 #define SIMTEMP_DEFAULT_MODE 0 /* NORMAL mode */
+#define SIMTEMP_DEFAULT_STATS {0, 0, 0, false}
 
 /* Global limits for period sampling_ms*/
-#define SIMTEMP_SAMPLING_MS_MAX 10u
-#define SIMTEMP_SAMPLING_MS_MIN 10000u
+#define SIMTEMP_SAMPLING_MS_MAX 10000u
+#define SIMTEMP_SAMPLING_MS_MIN 10u
+
+/* Global limits for period sampling_ms*/
+#define SIMTEMP_TEMPERATURE_MC_MAX 10000
+#define SIMTEMP_TEMPERATURE_MC_MIN -5000
 
 /* Event flag bits */
 #define SIMTEMP_FLAG_NEW_SAMPLE        (1U << 0)
 #define SIMTEMP_FLAG_THRESHOLD_CROSSED (1U << 1)
 
 /* Ring buffer size */
-#define RING_BUFF_SIZE 128
+#define RING_BUFF_SIZE 512
 /*******************************************************************************
  * Types
  ******************************************************************************/
@@ -60,7 +65,7 @@ struct simtemp_sample{
 } __attribute__((packed));
 
 enum simtemp_mode {
-	NORMAL,		/* Default mode */
+	NORMAL = 0,	/* Default mode */
 	NOISY,		/* Noisy mode */
 	RAMP		/* Ramp mode */
 };

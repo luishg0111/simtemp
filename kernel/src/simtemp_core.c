@@ -44,6 +44,7 @@ static int simtemp_probe(struct platform_device *pdev);
 static int simtemp_remove(struct platform_device *pdev);
 
 static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev);
+static const char *simtemp_mode_to_str(enum simtemp_mode mode);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -80,47 +81,67 @@ static struct platform_driver simtemp_driver = {
 static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 {
 	struct device_node *np = dev->of_node;
-	u32 tmp;
+	u32 samptemp;
+	s32 threstemp;
+	enum simtemp_mode modetemp;
 
 	if (!np) {
 		dev_info(dev, "no Device Tree node found, using defaults\n");
 		sdev->sampling_ms  = SIMTEMP_DEFAULT_SAMPLING_MS;
 		sdev->threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 		sdev->mode         = SIMTEMP_DEFAULT_MODE;
+		sdev->stats        = SIMTEMP_DEFAULT_STATS;
 		return 0;
 	}
 
 	dev_info(dev, "parsing Device Tree properties\n");
 
-	if (!of_property_read_u32(np, "sampling-ms", &tmp)) {
-		sdev->sampling_ms = tmp;
+	if (!of_property_read_u32(np, "sampling-ms", &samptemp)) {
+		sdev->sampling_ms = samptemp;
 	} else {
 		sdev->sampling_ms = SIMTEMP_DEFAULT_SAMPLING_MS;
 		dev_warn(dev, "sampling-ms not found, using default %u ms\n",
 			 sdev->sampling_ms);
 	}
 
-	if (!of_property_read_s32(np, "threshold-mC", &tmp)) {
-		sdev->threshold_mc = tmp;
+	if (!of_property_read_s32(np, "threshold-mC", &threstemp)) {
+		sdev->threshold_mc = threstemp;
 	} else {
 		sdev->threshold_mc = SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
-		dev_warn(dev, "threshold-mC not found, using default %u mC\n",
+		dev_warn(dev, "threshold-mC not found, using default %d mC\n",
 			 sdev->threshold_mc);
 	}
 
-	if (!of_property_read_u32(np, "mode", &tmp)) {
-		sdev->mode = tmp;
+	if (!of_property_read_u32(np, "mode", (u32 *)&modetemp)) {
+		sdev->mode = modetemp;
 	} else {
 		sdev->mode = SIMTEMP_DEFAULT_MODE;
-		dev_warn(dev, "mode not found, using default %u mC\n",
-			 sdev->mode);
+		dev_warn(dev, "mode not found, using default %s\n",
+			 simtemp_mode_to_str(sdev->mode));
 	}
 
+
 	dev_info(dev,
-		 "DT config: sampling=%u ms, threshold=%u mC, mode=%u\n",
-		 sdev->sampling_ms, sdev->threshold_mc, sdev->mode);
+		 "DT config: sampling=%u ms, threshold=%u mC, mode=%s\n",
+		 sdev->sampling_ms, sdev->threshold_mc, simtemp_mode_to_str(sdev->mode));
 
 	return 0;
+}
+
+/**
+ * @brief Parse simtemp_mode to string
+ *
+ * @param mode
+ * @return const char*
+ */
+static const char *simtemp_mode_to_str(enum simtemp_mode mode)
+{
+    switch (mode) {
+    case SIMTEMP_MODE_NORMAL: return "normal";
+    case SIMTEMP_MODE_NOISY:  return "noisy";
+    case SIMTEMP_MODE_RAMP:   return "ramp";
+    default:                  return "unknown";
+    }
 }
 
 /**
@@ -149,11 +170,6 @@ static int simtemp_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	spin_lock_init(&sdev->rb.lock);
-	spin_lock_init(&sdev->device_lock);
-	mutex_init(&sdev->device_mutex);
-	init_waitqueue_head(&sdev->read_queue);
-
 	/* Initialize modules */
 	ret = simtemp_hrtimer_init(sdev, sdev->sampling_ms);
 	if (ret) {
@@ -165,6 +181,7 @@ static int simtemp_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "%s: failed to init char device (%d)\n", DRIVER_NAME, ret);
 		simtemp_hrtimer_exit(sdev);
+		return ret;
 	}
 
 	ret = simtemp_sysfs_init(sdev);
@@ -172,6 +189,7 @@ static int simtemp_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: failed to create sysfs attributes (%d)\n",
 			DRIVER_NAME, ret);
 		simtemp_char_exit(sdev);
+		return ret;
 	}
 
 	dev_info(&pdev->dev, "%s: probe successful\n (sampling=%u ms)\n", DRIVER_NAME,
@@ -243,11 +261,11 @@ static void __exit simtemp_exit_module(void)
 {
 	pr_info("%s: unregistering driver and device\n", DRIVER_NAME);
 
-	if (simtemp_pdev)
+	if (simtemp_pdev) {
 		platform_device_unregister(simtemp_pdev);
-
+		simtemp_pdev = NULL;
+	}
 	platform_driver_unregister(&simtemp_driver);
-	kfree(simtemp_pdev);
 
 	pr_info("%s: module exit complete\n", DRIVER_NAME);
 }

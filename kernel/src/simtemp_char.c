@@ -96,8 +96,8 @@ static ssize_t simtemp_read(struct file *file, char __user *buf, size_t len, lof
 	ret = simtemp_rb_pop(&sdev->rb, &sdev->last_sample);
 	if (ret)
 		return 0;
-
 	spin_lock_irqsave(&sdev->rb.lock, flags);
+
 	if (copy_to_user(buf, &sdev->last_sample, sizeof(sdev->last_sample))) {
 		spin_unlock_irqrestore(&sdev->rb.lock, flags);
 		return -EFAULT;

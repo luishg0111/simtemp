@@ -59,11 +59,11 @@ static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp)
 	case NOISY:
 		/* larger random variation: [-500, +500] m°C */
 		noise = (s32)(get_random_u32() % 1001) - 500;
-		temp += noise;
+		 *temp += noise;
 		break;
 	case RAMP:
 		/* increase temperature by 100 m°C per sample */
-		temp += 100;
+		*temp += 100;
 		break;
 	default:
 		/* unknown mode, log error and use NORMAL behavior */
@@ -118,7 +118,6 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 		wake_up_poll(&sdev->read_queue, POLLIN | POLLRDNORM);
 	}
 	sample.flags = sflags;
-	spin_lock_irqsave(&sdev->rb.lock, rbflags);
 	spin_unlock_irqrestore(&sdev->device_lock, devflags);
 
 	/* push into ring buffer */
@@ -140,8 +139,9 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
  */
 int simtemp_hrtimer_init(struct simtemp_device *sdev, u32 sampling_ms)
 {
-	/* Init ringbuff */
 	spin_lock_init(&sdev->rb.lock);
+	init_waitqueue_head(&sdev->read_queue);
+	/* Init ringbuff */
 	sdev->rb.head = 0;
 	sdev->rb.tail = 0;
 

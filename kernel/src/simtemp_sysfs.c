@@ -46,6 +46,12 @@ static ssize_t record_format_show(struct device *dev, struct device_attribute *a
 /*******************************************************************************
  * Code
  ******************************************************************************/
+  /*
+ * Locking policy:
+ *  - simtemp_rb_push() and simtemp_rb_pop() take rb->lock internally.
+ *  - simtemp_rb_has_data() is lock-free and safe for concurrent readers.
+ *    Use READ_ONCE() to avoid reordering issues.
+ */
 /**
  * @brief Show sampling_ms attribute
  *
@@ -146,16 +152,17 @@ static ssize_t threshold_mc_store(struct device *dev,
 				  const char *buf, size_t count)
 {
 	struct simtemp_device *sdev = dev_get_drvdata(dev);
-	u32 new_thr;
+	s32 new_thr;
 	int ret;
 	unsigned long devflags;
 
-	ret = kstrtou32(buf, 0, &new_thr);
+	ret = kstrtoint(buf, 0, &new_thr);
 	if (ret)
 		return ret;
 
-	if (new_thr < -5000 || new_thr > 100000) {
-		dev_warn(dev, "Threshold out of range (-5 to 100 C). Introduce valid value.\n");
+	if (new_thr < SIMTEMP_TEMPERATURE_MC_MIN || new_thr > SIMTEMP_TEMPERATURE_MC_MAX) {
+		dev_warn(dev, "Threshold out of range (%d to %d mC). Introduce valid value.\n",
+			 SIMTEMP_TEMPERATURE_MC_MIN, SIMTEMP_TEMPERATURE_MC_MAX);
 		return -EINVAL;
 	}
 
@@ -222,11 +229,11 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 	struct simtemp_device *sdev = dev_get_drvdata(dev);
 	enum simtemp_mode new_mode;
 
-	if (sysfs_streq(buf, "normal\n")) {
+	if (sysfs_streq(buf, "normal")) {
 		new_mode = NORMAL;
-	} else if (sysfs_streq(buf, "noisy\n")) {
+	} else if (sysfs_streq(buf, "noisy")) {
 		new_mode = NOISY;
-	} else if (sysfs_streq(buf, "ramp\n")) {
+	} else if (sysfs_streq(buf, "ramp")) {
 		new_mode = RAMP;
 	} else {
 		dev_warn(dev, "Invalid mode. Use: normal|noisy|ramp\n");
@@ -235,7 +242,7 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 
 	mutex_lock(&sdev->device_mutex);
 	sdev->mode = new_mode;
-	mutex_lock(&sdev->device_mutex);
+	mutex_unlock(&sdev->device_mutex);
 
 	return count;
 }
@@ -306,6 +313,9 @@ int simtemp_sysfs_init(struct simtemp_device *sdev)
 {
 	struct device *dev = sdev->dev;
 	int ret = 0;
+
+	spin_lock_init(&sdev->device_lock);
+	mutex_init(&sdev->device_mutex);
 
 	ret = sysfs_create_group(&dev->kobj, &simtemp_attr_group);
 	if (ret) {
