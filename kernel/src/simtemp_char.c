@@ -158,7 +158,7 @@ int simtemp_char_init(struct simtemp_device *sdev)
 		return ret;
 	}
 
-	dev_info(sdev->dev, "simtemp char device ready: /dev/%s\n", sdev->miscdev.name);
+	simtemp_dbg(sdev->dev, "simtemp char device ready: /dev/%s\n", sdev->miscdev.name);
 
 	return ret;
 }

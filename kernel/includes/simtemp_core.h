@@ -26,6 +26,17 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
+/** Logging configuration (DEBUG vs RELEASE) */
+#ifdef DEBUG
+    /* DEBUG activates pr_debug() y dev_dbg() */
+    #define simtemp_dbg(dev, fmt, ...)  dev_dbg(dev, "[DBG] " fmt, ##__VA_ARGS__)
+    #define simtemp_pr_dbg(fmt, ...)    pr_debug("[DBG] " fmt, ##__VA_ARGS__)
+#else
+    /* RELEASE mode removes all the driver prints */
+    #define simtemp_dbg(dev, fmt, ...)  do { } while (0)
+    #define simtemp_pr_dbg(fmt, ...)    do { } while (0)
+#endif
+
 /* Driver names */
 #define DRIVER_NAME "nxp_simtemp"
 #define DEVICE_NAME "simtemp"

@@ -28,7 +28,7 @@ KERNEL_HEADERS="/lib/modules/${KERNEL_RELEASE}/build"
 # Targets
 # --------------------------------------------------------------------------
 TARGET=${1:-host}
-
+DEBUG_FLAG=${DEBUG:-0}
 # --------------------------------------------------------------------------
 # Toolchains
 # --------------------------------------------------------------------------
@@ -98,7 +98,7 @@ build_rpi() {
 		KDIR="/lib/modules/$(uname -r)/build"
 	fi
 
-	make -C "${KDIR}" M="${KERNEL_DIR}" ARCH=${RPI_ARCH} CROSS_COMPILE=${RPI_TOOLCHAIN} modules
+	make -C "${KDIR}" M="${KERNEL_DIR}" ARCH=${RPI_ARCH} CROSS_COMPILE=${RPI_TOOLCHAIN} DEBUG=$(DEBUG_FLAG) modules
 	make -C "${KERNEL_DIR}" dtbo
 }
 

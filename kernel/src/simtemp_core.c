@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/of.h>
+#include <linux/version.h>
 
 #include "simtemp_core.h"
 
@@ -41,7 +42,12 @@ static int __init simtemp_init_module(void);
 static void __exit simtemp_exit_module(void);
 
 static int simtemp_probe(struct platform_device *pdev);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
+static int simtemp_remove(struct platform_device *pdev);
+#else
 static void simtemp_remove(struct platform_device *pdev);
+#endif
 
 static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev);
 static const char *simtemp_mode_to_str(enum simtemp_mode mode);
@@ -86,7 +92,7 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 	enum simtemp_mode modetemp;
 
 	if (!np) {
-		dev_info(dev, "no Device Tree node found, using defaults\n");
+		simtemp_dbg(dev, "no Device Tree node found, using defaults\n");
 		sdev->sampling_ms		= SIMTEMP_DEFAULT_SAMPLING_MS;
 		sdev->threshold_mc		= SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 		sdev->mode			= SIMTEMP_DEFAULT_MODE;
@@ -98,7 +104,7 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 		return 0;
 	}
 
-	dev_info(dev, "parsing Device Tree properties\n");
+	simtemp_dbg(dev, "parsing Device Tree properties\n");
 
 	if (!of_property_read_u32(np, "sampling-ms", &samptemp)) {
 		sdev->sampling_ms = samptemp;
@@ -125,8 +131,7 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 	}
 
 
-	dev_info(dev,
-		 "DT config: sampling=%u ms, threshold=%u mC, mode=%s\n",
+	simtemp_dbg(dev, "DT config: sampling=%u ms, threshold=%u mC, mode=%s\n",
 		 sdev->sampling_ms, sdev->threshold_mc, simtemp_mode_to_str(sdev->mode));
 
 	return 0;
@@ -199,9 +204,11 @@ static int simtemp_probe(struct platform_device *pdev)
 		simtemp_char_exit(sdev);
 		return ret;
 	}
+	dev_info(&pdev->dev, "%s: Loaded successfully\n", DRIVER_NAME);
 
-	dev_info(&pdev->dev, "%s: probe successful\n (sampling=%u ms)\n", DRIVER_NAME,
-		 sdev->sampling_ms);
+	simtemp_dbg(sdev->dev, "%s: (sampling=%u ms, threshold=%d mC, mode=%s)\n",
+		 DRIVER_NAME, sdev->sampling_ms, sdev->threshold_mc,
+		 simtemp_mode_to_str(sdev->mode));
 	return ret;
 }
 
@@ -210,11 +217,12 @@ static int simtemp_probe(struct platform_device *pdev)
  *
  * @param pdev
  */
-static void simtemp_remove(struct platform_device *pdev)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
+static int simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_device *sdev = platform_get_drvdata(pdev);
 
-	dev_info(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
+	simtemp_dbg(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
 
 	/* Remove sysfs */
 	simtemp_sysfs_exit(sdev);
@@ -224,7 +232,26 @@ static void simtemp_remove(struct platform_device *pdev)
 	simtemp_hrtimer_exit(sdev);
 
 	dev_info(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
+	return 0;
 }
+#else
+static int simtemp_remove(struct platform_device *pdev)
+{
+	struct simtemp_device *sdev = platform_get_drvdata(pdev);
+
+	simtemp_dbg(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
+
+	/* Remove sysfs */
+	simtemp_sysfs_exit(sdev);
+	/* Remove char device */
+	simtemp_char_exit(sdev);
+	/* Remove hrtimer */
+	simtemp_hrtimer_exit(sdev);
+
+	simtemp_dbg(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
+	return 0;
+}
+#endif
 
 /**
  * @brief Module initialization
@@ -241,7 +268,7 @@ static int __init simtemp_init_module(void)
 		.id = PLATFORM_DEVID_NONE,
 	};
 
-	pr_info("%s: registering manual platform device\n", DRIVER_NAME);
+	simtemp_pr_dbg("%s: registering manual platform device\n", DRIVER_NAME);
 	ret = platform_driver_register(&simtemp_driver);
 	if (ret)
 		return ret;
@@ -254,7 +281,7 @@ static int __init simtemp_init_module(void)
 		return PTR_ERR(simtemp_pdev);
 	}
 
-	pr_info("%s: platform driver registered successfully\n", DRIVER_NAME);
+	simtemp_pr_dbg("%s: platform driver registered successfully\n", DRIVER_NAME);
 
 	return ret;
 }
@@ -265,7 +292,7 @@ static int __init simtemp_init_module(void)
  */
 static void __exit simtemp_exit_module(void)
 {
-	pr_info("%s: unregistering driver and device\n", DRIVER_NAME);
+	simtemp_pr_dbg("%s: unregistering driver and device\n", DRIVER_NAME);
 
 	if (simtemp_pdev) {
 		platform_device_unregister(simtemp_pdev);
@@ -273,7 +300,7 @@ static void __exit simtemp_exit_module(void)
 	}
 	platform_driver_unregister(&simtemp_driver);
 
-	pr_info("%s: module exit complete\n", DRIVER_NAME);
+	simtemp_pr_dbg("%s: module exit complete\n", DRIVER_NAME);
 }
 
 module_init(simtemp_init_module);

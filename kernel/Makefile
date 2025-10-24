@@ -15,7 +15,6 @@ ARCH ?= $(shell uname -m)
 # Default kernel build directory
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
-
 # === Rules ===
 
 all: modules dtbo postbuild
@@ -53,3 +52,5 @@ clean:
 	@echo "[+] Cleaning build artifacts..."
 	@$(MAKE) -C $(KDIR) M=$(PWD) clean
 	@rm -rf $(BUILD_DIR)
+
+ccflags-$(DEBUG) += -DDEBUG

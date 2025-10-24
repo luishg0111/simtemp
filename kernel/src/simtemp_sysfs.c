@@ -111,7 +111,7 @@ static ssize_t sampling_ms_store(struct device *dev,
 	hrtimer_cancel(&sdev->timer);
 	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
 
-	dev_info(sdev->dev, "sampling_ms updated to %u ms\n",
+	simtemp_dbg(sdev->dev, "sampling_ms updated to %u ms\n",
 		 sdev->sampling_ms);
 
 	return count;
@@ -172,7 +172,7 @@ static ssize_t threshold_mc_store(struct device *dev,
 	sdev->threshold_mc = new_thr;
 	spin_unlock_irqrestore(&sdev->device_lock, devflags);
 
-	dev_info(sdev->dev, "threshold_mc updated to %d\n", sdev->threshold_mc);
+	simtemp_dbg(sdev->dev, "threshold_mc updated to %d\n", sdev->threshold_mc);
 
 	return count;
 }
@@ -325,7 +325,7 @@ int simtemp_sysfs_init(struct simtemp_device *sdev)
 	}
 	dev_set_drvdata(dev, sdev);
 	sdev->dev = dev;
-	dev_info(dev, "sysfs attributes created /sys/class/misc/%s\n", DEVICE_NAME);
+	simtemp_dbg(dev, "sysfs attributes created /sys/class/misc/%s\n", DEVICE_NAME);
 
 	return ret;
 }
@@ -339,6 +339,6 @@ EXPORT_SYMBOL_GPL(simtemp_sysfs_init);
 void simtemp_sysfs_exit(struct simtemp_device *sdev)
 {
 	sysfs_remove_group(&sdev->dev->kobj, &simtemp_attr_group);
-	dev_info(sdev->dev, "sysfs group removed\n");
+	simtemp_dbg(sdev->dev, "sysfs group removed\n");
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_exit);

@@ -148,7 +148,7 @@ int simtemp_hrtimer_init(struct simtemp_device *sdev, u32 sampling_ms)
 	sdev->timer.function = simtemp_timer_callback;
 	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
 
-	pr_info("%s: hrtimer started (%u ms)\n", DRIVER_NAME, sdev->sampling_ms);
+	simtemp_pr_dbg("%s: hrtimer started (%u ms)\n", DRIVER_NAME, sdev->sampling_ms);
 
 	return 0;
 }
