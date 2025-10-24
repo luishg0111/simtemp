@@ -59,7 +59,7 @@ static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp)
 	case NOISY:
 		/* larger random variation: [-500, +500] m°C */
 		noise = (s32)(get_random_u32() % 1001) - 500;
-		 *temp += noise;
+		*temp += noise;
 		break;
 	case RAMP:
 		/* increase temperature by 100 m°C per sample */
@@ -87,11 +87,9 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 	u32 sflags = SIMTEMP_FLAG_NEW_SAMPLE;
 
 	/* Access configuration under lock */
-	spin_lock_irqsave(&sdev->device_lock, devflags);
 	temp = sdev->last_sample.temp_mc;
 	threshold = sdev->threshold_mc;
 	mode = sdev->mode;
-	spin_unlock_irqrestore(&sdev->device_lock, devflags);
 
 	temp_sample_behavior(mode, &temp);
 
@@ -124,7 +122,7 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
 	/* wake-up block events*/
 	wake_up_interruptible(&sdev->read_queue);
 	/* forward the timer and restart */
-	hrtimer_forward_now(&sdev->timer, ms_to_ktime(sdev->sampling_ms));
+	hrtimer_forward_now(&sdev->timer, ms_to_ktime(READ_ONCE(sdev->sampling_ms)));
 
 	return HRTIMER_RESTART;
 }
@@ -138,17 +136,15 @@ static enum hrtimer_restart simtemp_timer_callback(struct hrtimer *timer)
  */
 int simtemp_hrtimer_init(struct simtemp_device *sdev, u32 sampling_ms)
 {
-	spin_lock_init(&sdev->rb.lock);
-	init_waitqueue_head(&sdev->read_queue);
 	/* Init ringbuff */
 	sdev->rb.head = 0;
 	sdev->rb.tail = 0;
 
 	hrtimer_init(&sdev->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	sdev->timer.function = simtemp_timer_callback;
-	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
+	hrtimer_start(&sdev->timer, ms_to_ktime(READ_ONCE(sdev->sampling_ms)), HRTIMER_MODE_REL);
 
-	simtemp_pr_dbg("%s: hrtimer started (%u ms)\n", DRIVER_NAME, sdev->sampling_ms);
+	pr_info("%s: hrtimer started (%u ms)\n", DRIVER_NAME, sdev->sampling_ms);
 
 	return 0;
 }

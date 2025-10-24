@@ -40,19 +40,20 @@
 /* Driver names */
 #define DRIVER_NAME "nxp_simtemp"
 #define DEVICE_NAME "simtemp"
-#define CLASS_NAME  "simtemp_class"
+#define CLASS_NAME  "simtemp"
 #define COMPATIBLE_NAME "nxp,simtemp"
 
 /* Default config values */
 #define SIMTEMP_DEFAULT_SAMPLING_MS 1000
 #define SIMTEMP_DEFAULT_THRESHOLD_MILLIC 45000
-#define SIMTEMP_DEFAULT_TEMPERATURE_MC 42000
+#define SIMTEMP_DEFAULT_TEMPERATURE_MC 36000
 #define SIMTEMP_DEFAULT_TIMESTAMP_NS 0ULL
+#define SIMTEMP_DEFAULT_FLAGS 0 /* NORMAL mode */
 #define SIMTEMP_DEFAULT_MODE 0 /* NORMAL mode */
 
 /* Global limits for period sampling_ms*/
 #define SIMTEMP_SAMPLING_MS_MAX 10000u
-#define SIMTEMP_SAMPLING_MS_MIN 10u
+#define SIMTEMP_SAMPLING_MS_MIN 1u
 
 /* Global limits for period sampling_ms*/
 #define SIMTEMP_TEMPERATURE_MC_MAX 10000
@@ -95,7 +96,8 @@ struct simtemp_stats {
 /* Internal device data */
 struct simtemp_device {
 	struct miscdevice miscdev;		/* misc device for /dev/simtemp */
-	struct device *dev;			/* device for dev_info */	
+	struct device *dev;			/* device for dev_info */
+	struct class *cls;	
 
 	struct hrtimer timer;			/* timer */
 	u32 sampling_ms;     			/* sampling interval (ms) */

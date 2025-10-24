@@ -75,7 +75,7 @@ void simtemp_rb_push(struct ring_buffer *rb, const struct simtemp_sample *sample
 
 	spin_lock_irqsave(&rb->lock, rbflags);
 
-	if (rb->head == rb->tail)
+	if (ring_next(rb->head) == rb->tail)
 		rb->tail = ring_next(rb->tail); /* buffer full: advance tail */
 
 	rb->samples[rb->head] = *sample;
@@ -95,17 +95,17 @@ EXPORT_SYMBOL_GPL(simtemp_rb_push);
 int simtemp_rb_pop(struct ring_buffer *rb, struct simtemp_sample *out)
 {
 	unsigned long rbflags;
-	int empty;
+	bool has_data;
 
 	spin_lock_irqsave(&rb->lock, rbflags);
+	has_data = simtemp_rb_has_data(rb);
 
-	empty = (READ_ONCE(rb->head) == READ_ONCE(rb->tail));
-	if (!empty) {
+	if (has_data) {
 		*out = rb->samples[rb->tail];
 		WRITE_ONCE(rb->tail, ring_next(rb->tail));
 	}
 
 	spin_unlock_irqrestore(&rb->lock, rbflags);
-	return empty ? -1 : 0;
+	return	has_data ? 0 : -ENODATA;
 }
 EXPORT_SYMBOL_GPL(simtemp_rb_pop);

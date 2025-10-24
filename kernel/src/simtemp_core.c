@@ -43,11 +43,7 @@ static void __exit simtemp_exit_module(void);
 
 static int simtemp_probe(struct platform_device *pdev);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
 static int simtemp_remove(struct platform_device *pdev);
-#else
-static void simtemp_remove(struct platform_device *pdev);
-#endif
 
 static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev);
 static const char *simtemp_mode_to_str(enum simtemp_mode mode);
@@ -96,6 +92,11 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 		sdev->sampling_ms		= SIMTEMP_DEFAULT_SAMPLING_MS;
 		sdev->threshold_mc		= SIMTEMP_DEFAULT_THRESHOLD_MILLIC;
 		sdev->mode			= SIMTEMP_DEFAULT_MODE;
+
+		/* Initialize sample */
+		sdev->last_sample.temp_mc	= SIMTEMP_DEFAULT_TEMPERATURE_MC;
+		sdev->last_sample.timestamp_ns	= SIMTEMP_DEFAULT_TIMESTAMP_NS;
+		sdev->last_sample.flags		= SIMTEMP_DEFAULT_FLAGS;
 		/* Initialize stats members */
 		sdev->stats.alerts_count	= 0;
 		sdev->stats.errors_count	= 0;
@@ -130,9 +131,8 @@ static int simtemp_parse_dt(struct simtemp_device *sdev, struct device *dev)
 			 simtemp_mode_to_str(sdev->mode));
 	}
 
-
 	simtemp_dbg(dev, "DT config: sampling=%u ms, threshold=%u mC, mode=%s\n",
-		 sdev->sampling_ms, sdev->threshold_mc, simtemp_mode_to_str(sdev->mode));
+		    sdev->sampling_ms, sdev->threshold_mc, simtemp_mode_to_str(sdev->mode));
 
 	return 0;
 }
@@ -183,6 +183,11 @@ static int simtemp_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	spin_lock_init(&sdev->device_lock);
+	mutex_init(&sdev->device_mutex);
+	spin_lock_init(&sdev->rb.lock);
+	init_waitqueue_head(&sdev->read_queue);
+
 	/* Initialize modules */
 	ret = simtemp_hrtimer_init(sdev, sdev->sampling_ms);
 	if (ret) {
@@ -207,8 +212,8 @@ static int simtemp_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "%s: Loaded successfully\n", DRIVER_NAME);
 
 	simtemp_dbg(sdev->dev, "%s: (sampling=%u ms, threshold=%d mC, mode=%s)\n",
-		 DRIVER_NAME, sdev->sampling_ms, sdev->threshold_mc,
-		 simtemp_mode_to_str(sdev->mode));
+		    DRIVER_NAME, sdev->sampling_ms, sdev->threshold_mc,
+		    simtemp_mode_to_str(sdev->mode));
 	return ret;
 }
 
@@ -217,7 +222,6 @@ static int simtemp_probe(struct platform_device *pdev)
  *
  * @param pdev
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)
 static int simtemp_remove(struct platform_device *pdev)
 {
 	struct simtemp_device *sdev = platform_get_drvdata(pdev);
@@ -231,27 +235,9 @@ static int simtemp_remove(struct platform_device *pdev)
 	/* Remove hrtimer */
 	simtemp_hrtimer_exit(sdev);
 
-	dev_info(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
+	dev_info(&pdev->dev, "removed cleanly\n");
 	return 0;
 }
-#else
-static int simtemp_remove(struct platform_device *pdev)
-{
-	struct simtemp_device *sdev = platform_get_drvdata(pdev);
-
-	simtemp_dbg(&pdev->dev, "%s: remove - cleaning up\n", DRIVER_NAME);
-
-	/* Remove sysfs */
-	simtemp_sysfs_exit(sdev);
-	/* Remove char device */
-	simtemp_char_exit(sdev);
-	/* Remove hrtimer */
-	simtemp_hrtimer_exit(sdev);
-
-	simtemp_dbg(&pdev->dev, "%s: removed cleanly\n", DRIVER_NAME);
-	return 0;
-}
-#endif
 
 /**
  * @brief Module initialization

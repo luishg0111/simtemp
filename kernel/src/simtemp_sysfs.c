@@ -109,10 +109,10 @@ static ssize_t sampling_ms_store(struct device *dev,
 
 	/* reprogram timer outside lock */
 	hrtimer_cancel(&sdev->timer);
-	hrtimer_start(&sdev->timer, ms_to_ktime(sdev->sampling_ms), HRTIMER_MODE_REL);
+	hrtimer_start(&sdev->timer, ms_to_ktime(READ_ONCE(sdev->sampling_ms)), HRTIMER_MODE_REL);
 
 	simtemp_dbg(sdev->dev, "sampling_ms updated to %u ms\n",
-		 sdev->sampling_ms);
+		    sdev->sampling_ms);
 
 	return count;
 }
@@ -312,22 +312,39 @@ static const struct attribute_group simtemp_attr_group = {
  */
 int simtemp_sysfs_init(struct simtemp_device *sdev)
 {
-	struct device *dev = sdev->dev;
-	int ret = 0;
+	int ret;
 
-	spin_lock_init(&sdev->device_lock);
-	mutex_init(&sdev->device_mutex);
+	/* Create global class */
+	if (!sdev->cls) {
+		sdev->cls = class_create(CLASS_NAME);
+		if (IS_ERR(sdev->cls)) {
+			pr_err("simtemp: failed to create class\n");
+		return PTR_ERR(sdev->cls);
+		}
+	}
 
-	ret = sysfs_create_group(&dev->kobj, &simtemp_attr_group);
-	if (ret) {
-		dev_err(dev, "failed to create sysfs group\n");
+	/* Create device in class */
+	sdev->dev = device_create(sdev->cls, NULL, 0, sdev,
+				  "%s%d", DEVICE_NAME, 0);
+
+	if (IS_ERR(sdev->dev)) {
+		ret = PTR_ERR(sdev->dev);
+		class_destroy(sdev->cls);
+		pr_err("simtemp: failed to create device\n");
 		return ret;
 	}
-	dev_set_drvdata(dev, sdev);
-	sdev->dev = dev;
-	simtemp_dbg(dev, "sysfs attributes created /sys/class/misc/%s\n", DEVICE_NAME);
 
-	return ret;
+	/* Create sysfs attributes */
+	ret = sysfs_create_group(&sdev->dev->kobj, &simtemp_attr_group);
+	if (ret) {
+		device_destroy(sdev->cls, 0);
+		class_destroy(sdev->cls);
+		pr_err("simtemp: failed to create sysfs group\n");
+		return ret;
+	}
+
+	dev_info(sdev->dev, "sysfs group created under /sys/class/simtemp/\n");
+	return 0;
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_init);
 
@@ -338,7 +355,12 @@ EXPORT_SYMBOL_GPL(simtemp_sysfs_init);
  */
 void simtemp_sysfs_exit(struct simtemp_device *sdev)
 {
+	if (!sdev || !sdev->cls || !sdev->dev)
+		return;
+
 	sysfs_remove_group(&sdev->dev->kobj, &simtemp_attr_group);
-	simtemp_dbg(sdev->dev, "sysfs group removed\n");
+	device_destroy(sdev->cls, 0);
+	class_destroy(sdev->cls);
+	dev_info(sdev->dev, "sysfs group removed\n");
 }
 EXPORT_SYMBOL_GPL(simtemp_sysfs_exit);
