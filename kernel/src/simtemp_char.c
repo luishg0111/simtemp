@@ -143,6 +143,7 @@ int simtemp_char_init(struct simtemp_device *sdev)
 	sdev->miscdev.name  = DEVICE_NAME;
 	sdev->miscdev.fops  = &simtemp_fops;
 	sdev->miscdev.parent = sdev->dev;
+	sdev->miscdev.mode  = 0666; /* rw-rw-rw- easier to read in user space*/
 
 	ret = misc_register(&sdev->miscdev);
 	if (ret) {

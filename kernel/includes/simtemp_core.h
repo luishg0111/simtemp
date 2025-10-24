@@ -56,7 +56,7 @@
 #define SIMTEMP_SAMPLING_MS_MIN 1u
 
 /* Global limits for period sampling_ms*/
-#define SIMTEMP_TEMPERATURE_MC_MAX 10000
+#define SIMTEMP_TEMPERATURE_MC_MAX 100000
 #define SIMTEMP_TEMPERATURE_MC_MIN -5000
 
 /* Event flag bits */

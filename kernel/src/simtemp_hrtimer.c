@@ -57,13 +57,15 @@ static void temp_sample_behavior(enum simtemp_mode mode, s32 *temp)
 		/* no additional behavior */
 		break;
 	case NOISY:
-		/* larger random variation: [-500, +500] m°C */
-		noise = (s32)(get_random_u32() % 1001) - 500;
+		/* larger random variation: [-100, +100] m°C */
+		noise = (s32)(get_random_u32() % 2001) - 1000;
 		*temp += noise;
 		break;
 	case RAMP:
 		/* increase temperature by 100 m°C per sample */
 		*temp += 100;
+		if (*temp > SIMTEMP_TEMPERATURE_MC_MAX)
+			*temp = SIMTEMP_TEMPERATURE_MC_MIN; /* wrap around */
 		break;
 	default:
 		/* unknown mode, log error and use NORMAL behavior */
