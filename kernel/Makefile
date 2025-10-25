@@ -5,8 +5,10 @@
 PWD := $(shell pwd)
 # Default build output
 BUILD_DIR ?= $(PWD)/build
-DT_SRC := dts/nxp-simtemp.dtsi
-DT_OUT := $(BUILD_DIR)/nxp-simtemp.dtbo
+
+# Device Tree sources
+DT_SRC := dts/virt-custom.dts
+DT_OUT := $(BUILD_DIR)/virt-custom.dtb
 
 # Detect cross-compilation prefix
 # (can be set externally by build.sh)
@@ -17,7 +19,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 
 # === Rules ===
 
-all: modules dtbo postbuild
+all: modules dtb postbuild
 
 modules :
 	@echo "[+] Building kernel module..."
@@ -28,10 +30,11 @@ clean:
 	@$(MAKE) -C $(KDIR) M=$(PWD) clean
 	rm -rf $(BUILD_DIR)
 
-dtbo:
-	@echo "[+] Building Device Tree Overlay..."
+dtb:
+	@echo "[+] Building Device Tree Blob..."
 	@mkdir -p $(BUILD_DIR)
-	dtc -@ -I dts -O dtb -o $(DT_OUT) $(DT_SRC)
+	dtc -I dts -O dtb -o $(DT_OUT) $(DT_SRC)
+	@echo "-> Generated: $(DT_OUT)"
 
 postbuild:
 	@echo "[+] Collecting build artifacts into $(BUILD_DIR)"

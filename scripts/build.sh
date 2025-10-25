@@ -78,7 +78,7 @@ fi
 build_host() {
 	info "Building for host (native)..."
 	make -C "${KERNEL_DIR}" all
-	make -C "${KERNEL_DIR}" dtbo
+	make -C "${KERNEL_DIR}" dtb
 }
 
 build_rpi() {
@@ -99,13 +99,13 @@ build_rpi() {
 	fi
 
 	make -C "${KDIR}" M="${KERNEL_DIR}" ARCH=${RPI_ARCH} CROSS_COMPILE=${RPI_TOOLCHAIN} DEBUG=$(DEBUG_FLAG) modules
-	make -C "${KERNEL_DIR}" dtbo
+	make -C "${KERNEL_DIR}" dtb
 }
 
 build_qemu() {
 	info "Building for QEMU ARM (aarch64)..."
 	make -C "${KERNEL_DIR}" ARCH=arm64 all
-	make -C "${KERNEL_DIR}" dtbo
+	make -C "${KERNEL_DIR}" dtb
 }
 
 clean_build() {
