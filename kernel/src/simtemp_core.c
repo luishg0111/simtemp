@@ -3,7 +3,7 @@
  * @file simtemp_core.c
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief Virtual simulated temperature sensor driver
- * @version 0.1
+ * @version 1.0
  * @date 2025-10-15
  *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
@@ -296,4 +296,4 @@ module_exit(simtemp_exit_module);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Luis Hernández <luishg0111@gmail.com>");
 MODULE_DESCRIPTION("Virtual temperature sensor driver");
-MODULE_VERSION("0.4");
+MODULE_VERSION("1.0");

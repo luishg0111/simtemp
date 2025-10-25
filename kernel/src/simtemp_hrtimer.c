@@ -3,7 +3,7 @@
  * @file simtemp_hrtimer.c
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief Implementation of high-resolution timer for simulated temperature sensor
- * @version 0.1
+ * @version 1.0
  * @date 2025-10-15
  *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>

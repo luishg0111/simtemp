@@ -3,7 +3,7 @@
  * @file simtemp_char.h
  * @author Luis Hernández <luishg0111@gmail.com>
  * @brief
- * @version 0.1
+ * @version 1.0
  * @date 2025-10-15
  *
  * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
