@@ -1,0 +1,111 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/**
+ * @file simtemp_ringbuff.c
+ * @author Luis Hernández <luishg0111@gmail.com>
+ * @brief Implementation of high-resolution timer for simulated temperature sensor
+ * @version 1.0
+ * @date 2025-10-15
+ *
+ * @copyright Copyright (C) 2025 Luis Hernández <luishg0111@gmail.com>
+ *
+ */
+/*******************************************************************************
+ * Includes
+ ******************************************************************************/
+#include <linux/ktime.h>
+#include <linux/spinlock.h>
+#include <linux/random.h>
+
+#include "simtemp_ringbuff.h"
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
+
+/*******************************************************************************
+ * Types
+ ******************************************************************************/
+
+/*******************************************************************************
+ * Prototypes
+ ******************************************************************************/
+/* Inline functions */
+static inline unsigned int ring_next(unsigned int i);
+
+/*******************************************************************************
+ * Variables
+ ******************************************************************************/
+
+/*******************************************************************************
+ * Code
+ ******************************************************************************/
+
+/**
+ * @brief Advance the ring buffer index
+ *
+ * @param i
+ * @return unsigned int
+ */
+static inline unsigned int ring_next(unsigned int i)
+{
+	return (i + 1) % RING_BUFF_SIZE;
+}
+
+/**
+ * @brief Check if ring buffer has data
+ *
+ * @param rb
+ * @return true
+ * @return false
+ */
+bool simtemp_rb_has_data(struct ring_buffer *rb)
+{
+	return READ_ONCE(rb->head) != READ_ONCE(rb->tail);
+}
+EXPORT_SYMBOL_GPL(simtemp_rb_has_data);
+
+/**
+ * @brief Push a new sample into the ring buffer
+ *
+ * @param rb
+ * @param sample
+ */
+void simtemp_rb_push(struct ring_buffer *rb, const struct simtemp_sample *sample)
+{
+	unsigned long rbflags;
+
+	spin_lock_irqsave(&rb->lock, rbflags);
+
+	if (ring_next(rb->head) == rb->tail)
+		rb->tail = ring_next(rb->tail); /* buffer full: advance tail */
+
+	rb->samples[rb->head] = *sample;
+	WRITE_ONCE(rb->head, ring_next(rb->head));
+
+	spin_unlock_irqrestore(&rb->lock, rbflags);
+}
+EXPORT_SYMBOL_GPL(simtemp_rb_push);
+
+/**
+ * @brief Pop a sample from the ring buffer
+ *
+ * @param rb
+ * @param out
+ * @return int
+ */
+int simtemp_rb_pop(struct ring_buffer *rb, struct simtemp_sample *out)
+{
+	unsigned long rbflags;
+	bool has_data;
+
+	spin_lock_irqsave(&rb->lock, rbflags);
+	has_data = simtemp_rb_has_data(rb);
+
+	if (has_data) {
+		*out = rb->samples[rb->tail];
+		WRITE_ONCE(rb->tail, ring_next(rb->tail));
+	}
+
+	spin_unlock_irqrestore(&rb->lock, rbflags);
+	return	has_data ? 0 : -ENODATA;
+}
+EXPORT_SYMBOL_GPL(simtemp_rb_pop);

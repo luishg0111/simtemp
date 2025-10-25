@@ -1,11 +1,23 @@
-#Kernel artifacts
+# Folders
+.vscode/
+kernel/build/
+
+# Kernel artifacts
 *.o
 *.ko
+*.cmd
+*.mod
 *.mod.*
 *.symvers
 *.order
 Module.symvers
 module.order
 
-#Logs
+# Device Tree files
+*.dtbo
+
+# Logs
 *.log
+
+# checkpatch.pl
+.checkpatch-camelcase.git.

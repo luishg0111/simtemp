@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0
+# Kbuild for nxp_simtemp module
+
+# List of modules to build
+obj-m := nxp_simtemp.o
+
+# List of object files that form the module
+nxp_simtemp-objs := src/simtemp_core.o \
+                    src/simtemp_hrtimer.o \
+                    src/simtemp_char.o \
+                    src/simtemp_sysfs.o \
+                    src/simtemp_ringbuff.o
+
+ccflags-y := -I$(src)/includes
