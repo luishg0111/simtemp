@@ -11,6 +11,12 @@ This project implements a **virtual temperature sensor** in the Linux Kernel, si
 - **Shell scripts**: build, run demo, (optional) lint.
 - **Design quality**: modularity, locking choices, API contract, problem\-solving write\-ups.
 
+## Repo link
+[Simtemp](https://github.com/luishg0111/simtemp.git)
+
+## Runnig demo video
+[Demo video](https://drive.google.com/file/d/1Yf7yZUAtIMxWwFDP4AqvESycESVSgLaE/view?usp=sharing)
+
 ---
 ## Prerequisites
 
