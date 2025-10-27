@@ -59,7 +59,6 @@ qemu-system-aarch64 \
    -netdev user,id=user0,hostfwd=tcp::2222-:22
 ```
 ---
-## Build steps
 ## Build Steps
 
 The script `scripts/build.sh` automates module compilation for different targets.
